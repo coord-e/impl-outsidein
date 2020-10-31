@@ -15,6 +15,7 @@ import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap (empty, insert, intersection, keys, lookup, member, union)
 import qualified Data.HashSet as HashSet (delete, difference, union)
 import qualified Data.Vector as Vector (length, zip)
+import Data.Void (vacuous)
 import Language.Simple.Fresh (Fresh (..), GenFresh)
 import Language.Simple.Syntax
   ( CaseArm (..),
@@ -29,8 +30,6 @@ import Language.Simple.Syntax
     TypeScheme (..),
     TypeVar,
     functionType,
-    upgradeConstraint,
-    upgradeMonotype,
   )
 import Language.Simple.Type.Constraint (GeneratedConstraint (..), UniVar, fuv)
 import Language.Simple.Type.Env (HasLocalTypeEnv (..), HasProgramEnv (..), HasTypeEnv (..))
@@ -121,8 +120,8 @@ generateConstraint (AnnotatedLetExpr x s e1 e2)
       let ForallTypeScheme {constraint, monotype} = s
       envFuv <- localEnvFuv
       let delta = (fuv t1 `HashSet.union` fuv c1) `HashSet.difference` envFuv
-      let c = c1 <> Constraint (EqualityConstraint t1 (upgradeMonotype monotype))
-      pure (t2, c1 <> c2 <> ExistentialGeneratedConstraint delta (upgradeConstraint constraint) c)
+      let c = c1 <> Constraint (EqualityConstraint t1 (vacuous monotype))
+      pure (t2, c1 <> c2 <> ExistentialGeneratedConstraint delta (vacuous constraint) c)
 
 dataCtorTypeToTypeScheme :: DataCtorType -> TypeScheme
 dataCtorTypeToTypeScheme DataCtorType {universalVars, existentialVars, constraint, fields, ctor, ctorArgs} =

@@ -11,6 +11,7 @@ import Control.Monad.State (get, put, runStateT)
 import Control.Monad.Trans (lift)
 import qualified Data.HashMap.Strict as HashMap (elems, empty, insert, lookup)
 import qualified Data.Vector as Vector (fromList)
+import Data.Void (vacuous)
 import Language.Simple.Fresh (Fresh (..))
 import Language.Simple.Syntax
   ( Binding (..),
@@ -19,8 +20,6 @@ import Language.Simple.Syntax
     Program (..),
     TermVar,
     TypeScheme (..),
-    upgradeConstraint,
-    upgradeMonotype,
   )
 import Language.Simple.Type.Constraint (GeneratedConstraint (..), UniVar, fuv)
 import Language.Simple.Type.Env (HasLocalTypeEnv (..), HasProgramEnv, HasTypeEnv (..), runEnvT)
@@ -66,8 +65,8 @@ typeBinding (AnnotatedBinding x s@ForallTypeScheme {constraint, monotype} e) = d
   (v, c) <- withTermVar x s $ generateConstraint e
   -- Solve
   let tch = fuv v <> fuv c
-  let c' = c <> Constraint (EqualityConstraint v (upgradeMonotype monotype))
-  (q, _) <- solveConstraint (upgradeConstraint constraint) tch c'
+  let c' = c <> Constraint (EqualityConstraint v (vacuous monotype))
+  (q, _) <- solveConstraint (vacuous constraint) tch c'
   unless (isEmpty q) $ throwError (UnresolvedConstraint q)
   logDocInfo $ "typed annotated binding" <+> pretty x <+> "::" <+> nest 2 (pretty s)
   pure (x, s)

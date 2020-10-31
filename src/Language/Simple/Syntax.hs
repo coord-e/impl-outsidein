@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
@@ -25,13 +26,11 @@ module Language.Simple.Syntax
     TypeScheme (..),
     Monotype (..),
     SimpleMonotype,
-    upgradeMonotype,
     functionType,
     TypeVar (..),
     TypeCtor (..),
     Constraint (..),
     SimpleConstraint,
-    upgradeConstraint,
   )
 where
 
@@ -170,11 +169,7 @@ data Monotype a
     ApplyType TypeCtor (Vector (Monotype a))
   | -- | Unification type variable. \( \alpha \)
     UniType a
-  deriving (Show, Generic)
-
-upgradeMonotype :: SimpleMonotype -> Monotype v
-upgradeMonotype (VarType v) = VarType v
-upgradeMonotype (ApplyType k ts) = ApplyType k $ fmap upgradeMonotype ts
+  deriving (Show, Functor, Generic)
 
 type SimpleMonotype = Monotype Void
 
@@ -228,14 +223,9 @@ data Constraint a
     ProductConstraint (Constraint a) (Constraint a)
   | -- | Equality constraint of two types. \( \tau_1 \sim \tau_2 \)
     EqualityConstraint (Monotype a) (Monotype a)
-  deriving (Show, Generic)
+  deriving (Show, Functor, Generic)
 
 type SimpleConstraint = Constraint Void
-
-upgradeConstraint :: SimpleConstraint -> Constraint v
-upgradeConstraint EmptyConstraint = EmptyConstraint
-upgradeConstraint (ProductConstraint c1 c2) = ProductConstraint (upgradeConstraint c1) (upgradeConstraint c2)
-upgradeConstraint (EqualityConstraint t1 t2) = EqualityConstraint (upgradeMonotype t1) (upgradeMonotype t2)
 
 instance Semigroup (Constraint a) where
   (<>) = ProductConstraint
