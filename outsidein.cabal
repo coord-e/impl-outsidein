@@ -1,0 +1,72 @@
+cabal-version:   2.4
+name:            outsidein
+version:         0.1.0.0
+license:         BSD-3-Clause
+license-file:    LICENSE.md
+maintainer:      coord_e <me@coord-e.com>
+author:          coord_e
+homepage:        https://github.com/coord-e/outsidein
+bug-reports:     https://github.com/coord-e/outsidein/issues
+synopsis:        Toy implementation of OutsideIn(X)
+description:     Toy implementation of OutsideIn(X).
+extra-doc-files:
+    README.md
+    CHANGELOG.md
+
+source-repository head
+    type:     git
+    location: https://github.com/coord-e/outsidein
+
+library
+    exposed-modules:
+        Language.Simple.Syntax
+        Language.Simple.Type
+        Language.Simple.Parser
+        Language.Simple
+
+    hs-source-dirs:   src
+    other-modules:
+        Language.Simple.Util
+        Language.Simple.Fresh
+        Language.Simple.Type.Env
+        Language.Simple.Type.Program
+        Language.Simple.Type.Generator
+        Language.Simple.Type.Constraint
+        Language.Simple.Type.Solver
+        Language.Simple.Type.Error
+        Language.Simple.Type.Substitution
+
+    default-language: Haskell2010
+    ghc-options:
+        -Wall -Werror -Wcompat -Wincomplete-record-updates
+        -Wincomplete-uni-patterns -Wnoncanonical-monad-instances
+        -Wno-missing-home-modules
+
+    build-depends:
+        base ^>=4.14.1.0,
+        hashable ^>=1.3,
+        unordered-containers ^>=0.2,
+        vector ^>=0.12,
+        text ^>=1.2,
+        mtl ^>=2.2,
+        parsers ^>=0.12,
+        attoparsec ^>=0.13,
+        monad-logger ^>=0.3,
+        prettyprinter ^>=1.7
+
+executable outsidein
+    main-is:          Main.hs
+    hs-source-dirs:   app
+    other-modules:    App
+    default-language: Haskell2010
+    ghc-options:
+        -Wall -Werror -Wcompat -Wincomplete-record-updates
+        -Wincomplete-uni-patterns -Wnoncanonical-monad-instances
+
+    build-depends:
+        base ^>=4.14.1.0,
+        text ^>=1.2,
+        mtl ^>=2.2,
+        monad-logger ^>=0.3,
+        prettyprinter ^>=1.7,
+        outsidein -any
