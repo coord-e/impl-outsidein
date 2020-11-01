@@ -1,8 +1,14 @@
+{-# LANGUAGE ExplicitForAll #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE UndecidableInstances #-}
 
-module Language.Simple.Type.Program (typeProgram) where
+module Language.Simple.Type.Program
+  ( typeProgram,
+  )
+where
 
 import Control.Monad (unless)
 import Control.Monad.Except (MonadError (..))
@@ -12,25 +18,35 @@ import Control.Monad.Trans (lift)
 import qualified Data.HashMap.Strict as HashMap (elems, empty, insert, lookup)
 import qualified Data.Vector as Vector (fromList)
 import Data.Void (vacuous)
+import Language.Simple.Extension (Extension, Generalizable (..))
 import Language.Simple.Fresh (Fresh (..))
 import Language.Simple.Syntax
   ( Binding (..),
     Constraint (..),
+    ExtensionConstraint,
+    ExtensionMonotype,
     Monotype (..),
     Program (..),
     TermVar,
     TypeScheme (..),
   )
-import Language.Simple.Type.Constraint (GeneratedConstraint (..), UniVar, fuv)
+import Language.Simple.Type.Constraint (Fuv (..), GeneratedConstraint (..), UniVar)
 import Language.Simple.Type.Env (HasLocalTypeEnv (..), HasProgramEnv, HasTypeEnv (..), runEnvT)
 import Language.Simple.Type.Error (TypeError (..))
 import Language.Simple.Type.Generator (generateConstraint)
 import Language.Simple.Type.Solver (solveConstraint)
-import Language.Simple.Type.Substitution (substitute)
+import Language.Simple.Type.Substitution (Substitutable (..))
 import Language.Simple.Util (logDocInfo)
-import Prettyprinter (nest, pretty, (<+>))
+import Prettyprinter (Pretty (..), nest, (<+>))
 
-typeProgram :: (MonadLogger m, MonadError TypeError m) => Program -> m ()
+typeProgram ::
+  forall x m.
+  ( Extension x,
+    MonadLogger m,
+    MonadError (TypeError x) m
+  ) =>
+  Program x ->
+  m ()
 typeProgram Program {bindings, axioms, dataCtors} = runEnvT axioms dataCtors $ foldr go (pure ()) bindings
   where
     go binding acc = do
@@ -38,15 +54,16 @@ typeProgram Program {bindings, axioms, dataCtors} = runEnvT axioms dataCtors $ f
       withTermVar x s acc
 
 typeBinding ::
-  ( HasLocalTypeEnv m,
-    HasTypeEnv m,
-    HasProgramEnv m,
+  ( Extension x,
+    HasLocalTypeEnv x m,
+    HasTypeEnv x m,
+    HasProgramEnv x m,
     Fresh m,
     MonadLogger m,
-    MonadError TypeError m
+    MonadError (TypeError x) m
   ) =>
-  Binding ->
-  m (TermVar, TypeScheme)
+  Binding x ->
+  m (TermVar, TypeScheme x)
 typeBinding (UnannotatedBinding x e) = do
   -- Generate
   a <- UniType <$> fresh
@@ -57,7 +74,7 @@ typeBinding (UnannotatedBinding x e) = do
   (q, u) <- solveConstraint mempty tch c'
   let t' = substitute u t
   -- Generalize
-  s <- generalize q t'
+  s <- generalizeToTypeScheme q t'
   logDocInfo $ "typed unannotated binding" <+> pretty x <+> "::" <+> nest 2 (pretty s)
   pure (x, s)
 typeBinding (AnnotatedBinding x s@ForallTypeScheme {constraint, monotype} e) = do
@@ -74,9 +91,19 @@ typeBinding (AnnotatedBinding x s@ForallTypeScheme {constraint, monotype} e) = d
     isEmpty EmptyConstraint = True
     isEmpty _ = False
 
-generalize :: Fresh m => Constraint UniVar -> Monotype UniVar -> m TypeScheme
-generalize q t = do
-  ((constraint, monotype), vars) <- runStateT gen HashMap.empty
+generalizeToTypeScheme ::
+  ( Generalizable x (ExtensionMonotype x),
+    Generalizable x (ExtensionConstraint x),
+    Fresh m
+  ) =>
+  Constraint x UniVar ->
+  Monotype x UniVar ->
+  m (TypeScheme x)
+generalizeToTypeScheme q t = do
+  ((constraint, monotype), vars) <- flip runStateT HashMap.empty $ do
+    q' <- generalize gen q
+    t' <- generalize gen t
+    pure (q', t')
   pure
     ForallTypeScheme
       { vars = Vector.fromList $ HashMap.elems vars,
@@ -84,14 +111,7 @@ generalize q t = do
         monotype
       }
   where
-    gen = do
-      q' <- genConstraint q
-      t' <- genMonotype t
-      pure (q', t')
-    genConstraint EmptyConstraint = pure EmptyConstraint
-    genConstraint (ProductConstraint q1 q2) = ProductConstraint <$> genConstraint q1 <*> genConstraint q2
-    genConstraint (EqualityConstraint t1 t2) = EqualityConstraint <$> genMonotype t1 <*> genMonotype t2
-    genMonotype (UniType u) = do
+    gen u = do
       m <- get
       case HashMap.lookup u m of
         Just v -> pure $ VarType v
@@ -99,5 +119,3 @@ generalize q t = do
           v <- lift fresh
           put $ HashMap.insert u v m
           pure $ VarType v
-    genMonotype (VarType v) = pure $ VarType v
-    genMonotype (ApplyType k ts) = ApplyType k <$> mapM genMonotype ts

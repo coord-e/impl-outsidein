@@ -22,6 +22,8 @@ library
         Language.Simple.Syntax
         Language.Simple.Type
         Language.Simple.Parser
+        Language.Simple.Extension
+        Language.Simple.Extension.SimpleUnification
         Language.Simple
 
     hs-source-dirs:   src
@@ -40,7 +42,7 @@ library
     ghc-options:
         -Wall -Werror -Wcompat -Wincomplete-record-updates
         -Wincomplete-uni-patterns -Wnoncanonical-monad-instances
-        -Wno-missing-home-modules
+        -Wno-missing-home-modules -Wno-error=overlapping-patterns
 
     build-depends:
         base ^>=4.14.1.0,

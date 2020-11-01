@@ -1,10 +1,12 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Language.Simple.Type.Constraint
   ( UniVar (..),
@@ -21,7 +23,7 @@ import qualified Data.HashSet as HashSet (difference, empty, singleton, toList, 
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
 import Language.Simple.Fresh (GenFresh (..))
-import Language.Simple.Syntax (Constraint (..), Monotype (..))
+import Language.Simple.Syntax (Constraint (..), ExtensionConstraint, ExtensionMonotype, Monotype (..))
 import Numeric.Natural (Natural)
 import Prettyprinter (Pretty (..), hsep, nest, parens, sep, space, unsafeViaShow, (<+>))
 
@@ -36,23 +38,23 @@ instance GenFresh UniVar where
 instance Pretty UniVar where
   pretty (UniVar n) = "'u" <> unsafeViaShow n
 
-data GeneratedConstraint
-  = Constraint (Constraint UniVar)
-  | ProductGeneratedConstraint GeneratedConstraint GeneratedConstraint
-  | ExistentialGeneratedConstraint (HashSet UniVar) (Constraint UniVar) GeneratedConstraint
-  deriving (Show, Generic)
+data GeneratedConstraint x
+  = Constraint (Constraint x UniVar)
+  | ProductGeneratedConstraint (GeneratedConstraint x) (GeneratedConstraint x)
+  | ExistentialGeneratedConstraint (HashSet UniVar) (Constraint x UniVar) (GeneratedConstraint x)
+  deriving (Generic)
 
-simple :: GeneratedConstraint -> Constraint UniVar
+simple :: GeneratedConstraint x -> Constraint x UniVar
 simple (Constraint q) = q
 simple (ProductGeneratedConstraint c1 c2) = simple c1 <> simple c2
 simple (ExistentialGeneratedConstraint _ _ _) = mempty
 
-implic :: GeneratedConstraint -> [(HashSet UniVar, Constraint UniVar, GeneratedConstraint)]
+implic :: GeneratedConstraint x -> [(HashSet UniVar, Constraint x UniVar, GeneratedConstraint x)]
 implic (Constraint _) = mempty
 implic (ProductGeneratedConstraint c1 c2) = implic c1 <> implic c2
 implic (ExistentialGeneratedConstraint vs p c) = [(vs, p, c)]
 
-reduce :: Constraint a -> Constraint a
+reduce :: Constraint x a -> Constraint x a
 reduce (ProductConstraint q1 q2) = reduce1 (ProductConstraint (reduce q1) (reduce q2))
   where
     reduce1 (ProductConstraint EmptyConstraint EmptyConstraint) = EmptyConstraint
@@ -61,13 +63,18 @@ reduce (ProductConstraint q1 q2) = reduce1 (ProductConstraint (reduce q1) (reduc
     reduce1 q = q
 reduce q = q
 
-instance Semigroup GeneratedConstraint where
+instance Semigroup (GeneratedConstraint x) where
   (<>) = ProductGeneratedConstraint
 
-instance Monoid GeneratedConstraint where
+instance Monoid (GeneratedConstraint x) where
   mempty = Constraint mempty
 
-instance Pretty GeneratedConstraint where
+instance
+  ( Pretty (ExtensionMonotype x UniVar),
+    Pretty (ExtensionConstraint x UniVar)
+  ) =>
+  Pretty (GeneratedConstraint x)
+  where
   pretty (Constraint q) = pretty q
   pretty (ProductGeneratedConstraint c1 c2) = sep [pretty c1, "∧" <+> pretty c2]
   pretty (ExistentialGeneratedConstraint vs q c) = quant <+> parens (nest 2 (qual q <> pretty c))
@@ -79,17 +86,24 @@ instance Pretty GeneratedConstraint where
 class Fuv a where
   fuv :: a -> HashSet UniVar
 
-instance Fuv (Monotype UniVar) where
+instance Fuv (ExtensionMonotype x UniVar) => Fuv (Monotype x UniVar) where
   fuv (VarType _) = HashSet.empty
   fuv (ApplyType _ ts) = foldMap fuv ts
   fuv (UniType u) = HashSet.singleton u
+  fuv (ExtensionType x) = fuv x
 
-instance Fuv (Constraint UniVar) where
+instance
+  ( Fuv (ExtensionMonotype x UniVar),
+    Fuv (ExtensionConstraint x UniVar)
+  ) =>
+  Fuv (Constraint x UniVar)
+  where
   fuv EmptyConstraint = HashSet.empty
   fuv (ProductConstraint q1 q2) = HashSet.union (fuv q1) (fuv q2)
   fuv (EqualityConstraint t1 t2) = HashSet.union (fuv t1) (fuv t2)
+  fuv (ExtensionConstraint x) = fuv x
 
-instance Fuv GeneratedConstraint where
+instance Fuv (Constraint x UniVar) => Fuv (GeneratedConstraint x) where
   fuv (Constraint q) = fuv q
   fuv (ProductGeneratedConstraint c1 c2) = HashSet.union (fuv c1) (fuv c2)
   fuv (ExistentialGeneratedConstraint vars q c) = HashSet.difference (HashSet.union (fuv q) (fuv c)) vars

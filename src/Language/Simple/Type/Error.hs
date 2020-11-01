@@ -1,19 +1,33 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Language.Simple.Type.Error
   ( TypeError (..),
+    ExtensionTypeError,
   )
 where
 
 import GHC.Generics (Generic)
-import Language.Simple.Syntax (Constraint (..), DataCtor, Monotype (..), TermVar, TypeVar)
+import Language.Simple.Syntax
+  ( Constraint (..),
+    DataCtor,
+    ExtensionConstraint,
+    ExtensionMonotype,
+    Monotype (..),
+    TermVar,
+    TypeVar,
+  )
 import Language.Simple.Type.Constraint (UniVar)
 import Prettyprinter (Doc, Pretty (..), dquotes, nest, sep, squotes, vsep, (<+>))
 
-data TypeError
+type family ExtensionTypeError x
+
+data TypeError x
   = UnboundTermVar TermVar
   | UnboundTypeVar TypeVar
   | UnboundDataCtor DataCtor
@@ -23,10 +37,17 @@ data TypeError
         expected :: Int,
         got :: Int
       }
-  | UnresolvedConstraint (Constraint UniVar)
-  deriving (Show, Generic)
+  | UnresolvedConstraint (Constraint x UniVar)
+  | ExtensionTypeError (ExtensionTypeError x)
+  deriving (Generic)
 
-instance Pretty TypeError where
+instance
+  ( Pretty (ExtensionMonotype x UniVar),
+    Pretty (ExtensionConstraint x UniVar),
+    Pretty (ExtensionTypeError x)
+  ) =>
+  Pretty (TypeError x)
+  where
   pretty (UnboundTermVar x) = "unbound variable:" <+> pretty x
   pretty (UnboundTypeVar a) = "unbound type variable:" <+> pretty a
   pretty (UnboundDataCtor k) = "unbound data constructor:" <+> pretty k
@@ -42,8 +63,14 @@ instance Pretty TypeError where
             <+> pretty got
         ]
   pretty (UnresolvedConstraint q) = vsep $ prettyUnresolvedConstraint q
+  pretty (ExtensionTypeError x) = pretty x
 
-prettyUnresolvedConstraint :: Constraint UniVar -> [Doc ann]
+prettyUnresolvedConstraint ::
+  ( Pretty (ExtensionMonotype x UniVar),
+    Pretty (ExtensionConstraint x UniVar)
+  ) =>
+  Constraint x UniVar ->
+  [Doc ann]
 prettyUnresolvedConstraint EmptyConstraint = []
 prettyUnresolvedConstraint (ProductConstraint q1 q2) = prettyUnresolvedConstraint q1 <> prettyUnresolvedConstraint q2
 prettyUnresolvedConstraint (EqualityConstraint t1 t2) =
@@ -62,3 +89,4 @@ prettyUnresolvedConstraint (EqualityConstraint t1 t2) =
     additionalInfo (VarType a) _ = [dquotes (pretty a) <+> "is a rigid type variable"]
     additionalInfo _ (VarType a) = [dquotes (pretty a) <+> "is a rigid type variable"]
     additionalInfo _ _ = []
+prettyUnresolvedConstraint (ExtensionConstraint x) = ["unresolved constraint:" <+> pretty x]
