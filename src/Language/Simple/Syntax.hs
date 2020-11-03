@@ -82,7 +82,7 @@ data AxiomScheme x = ForallAxiomScheme
     -- | Constraint for the quantified variables.
     constraint :: SimpleConstraint x,
     -- | The axiom.
-    head :: Constraint x TypeVar
+    head :: SimpleConstraint x
   }
   deriving (Generic)
 

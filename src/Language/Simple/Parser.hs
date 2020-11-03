@@ -19,7 +19,8 @@ import Data.Vector (Vector)
 import qualified Data.Vector as Vector (fromList)
 import Language.Simple.Extension (Extension, extensionParser)
 import Language.Simple.Syntax
-  ( Binding (..),
+  ( AxiomScheme (..),
+    Binding (..),
     CaseArm (..),
     Constraint (..),
     DataCtor (..),
@@ -57,8 +58,14 @@ programParser :: (Extension x, TokenParsing m) => m (Program x)
 programParser = Program <$> lets <*> axiom <*> datum
   where
     lets = manyV (textSymbol "let" *> bindingParser)
-    axiom = pure mempty
+    axiom = manyV (textSymbol "axiom" *> axiomSchemeParser)
     datum = HashMap.fromList <$> many (textSymbol "data" *> dataCtorDeclParser)
+
+axiomSchemeParser :: (Extension x, TokenParsing m) => m (AxiomScheme x)
+axiomSchemeParser = ForallAxiomScheme <$> orEmpty quant <*> orEmpty qual <*> constraintParser <?> "axiom scheme"
+  where
+    quant = textSymbol "forall" *> manyV typeVarParser <* dot
+    qual = parensConstraintParser <* textSymbol "=>"
 
 dataCtorDeclParser :: (Extension x, TokenParsing m) => m (DataCtor, DataCtorType x)
 dataCtorDeclParser = (,) <$> (dataCtorParser <* textSymbol "::") <*> dataCtorTypeParser
@@ -74,7 +81,7 @@ dataCtorTypeParser =
   where
     forallQuant = textSymbol "forall" *> manyV typeVarParser <* dot
     existsQuant = textSymbol "exists" *> manyV typeVarParser <* dot
-    qual = constraintParser <* textSymbol "=>"
+    qual = parensConstraintParser <* textSymbol "=>"
     fieldParams = manyV (atomMonotypeParser <* textSymbol "->")
 
 bindingParser :: (Extension x, TokenParsing m) => m (Binding x)
@@ -113,13 +120,19 @@ typeSchemeParser :: (Extension x, TokenParsing m) => m (TypeScheme x)
 typeSchemeParser = ForallTypeScheme <$> orEmpty quant <*> orEmpty qual <*> monotypeParser <?> "type scheme"
   where
     quant = textSymbol "forall" *> manyV typeVarParser <* dot
-    qual = constraintParser <* textSymbol "=>"
+    qual = parensConstraintParser <* textSymbol "=>"
 
-constraintParser :: (Extension x, TokenParsing m) => m (SimpleConstraint x)
-constraintParser = foldProd <$> prod <?> "constraint"
+parensConstraintParser :: (Extension x, TokenParsing m) => m (SimpleConstraint x)
+parensConstraintParser = foldProd <$> prod <?> "constraint"
   where
     foldProd = foldr ProductConstraint EmptyConstraint
-    prod = parens (commaSep (ext <|> equal <|> constraintParser))
+    prod = parens (commaSep constraintParser)
+
+constraintParser :: (Extension x, TokenParsing m) => m (SimpleConstraint x)
+constraintParser =
+  -- `try` is carelessly placed here to parse typeclass-like constraint in `ext`
+  parensConstraintParser <|> try equal <|> ext
+  where
     equal = EqualityConstraint <$> (monotypeParser <* textSymbol "~") <*> monotypeParser
     ext = ExtensionConstraint <$> extensionParser
 
@@ -139,7 +152,7 @@ monotypeParser = f <$> atomMonotypeParser <*> many (textSymbol "->" *> atomMonot
     f lhs ts = functionType lhs $ foldr1 functionType ts
 
 keywords :: [Text]
-keywords = ["let", "data", "case", "in"]
+keywords = ["let", "data", "case", "in", "axiom"]
 
 keyword :: TokenParsing m => Text -> m Text
 keyword x = try (text x <* notFollowedBy alphaNum) <* whiteSpace
