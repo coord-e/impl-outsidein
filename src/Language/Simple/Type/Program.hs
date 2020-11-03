@@ -70,8 +70,8 @@ typeBinding (UnannotatedBinding x e) = do
   a <- UniType <$> fresh
   (t, c) <- withLocalVar x a $ generateConstraint e
   -- Solve
-  let tch = fuv t <> fuv c
   let c' = c <> Constraint (EqualityConstraint a t)
+  let tch = fuv t <> fuv c'
   (q, u) <- solveConstraint mempty tch c'
   let t' = substitute u t
   -- Generalize
