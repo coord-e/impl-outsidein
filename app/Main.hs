@@ -8,7 +8,7 @@ import App
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Text.IO as Text (readFile)
 import Language.Simple.Extension (Extension)
-import Language.Simple.Extension.SimpleUnification (SimpleUnification)
+import Language.Simple.Extension.TypeClass (TypeClass)
 import Language.Simple.Parser (parseProgram)
 import Language.Simple.Type (typeProgram)
 import System.Environment (getArgs)
@@ -22,4 +22,4 @@ typeFile file = do
 main :: IO ()
 main = do
   [path] <- getArgs
-  runApp (typeFile @SimpleUnification path)
+  runApp (typeFile @TypeClass path)

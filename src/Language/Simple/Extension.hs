@@ -17,6 +17,7 @@ where
 import Control.Monad.Except (MonadError)
 import Data.HashSet (HashSet)
 import Data.Void (Void)
+import Language.Simple.Fresh (Fresh)
 import Language.Simple.Syntax (Constraint (..), ExtensionConstraint, ExtensionMonotype, Monotype (..), SimpleMonotype, TypeVar)
 import Language.Simple.Type.Constraint (Fuv (..), UniVar)
 import Language.Simple.Type.Env (HasProgramEnv)
@@ -33,7 +34,8 @@ class
   Extension x
   where
   simplifyConstraint ::
-    ( HasProgramEnv x m,
+    ( Fresh m,
+      HasProgramEnv x m,
       MonadError (TypeError x) m
     ) =>
     Constraint x UniVar ->

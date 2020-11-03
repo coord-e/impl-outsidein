@@ -6,6 +6,25 @@
 module Language.Simple.Parser
   ( ParseError (..),
     parseProgram,
+
+    -- * Parsers
+    programParser,
+    dataCtorDeclParser,
+    dataCtorTypeParser,
+    bindingParser,
+    exprParser,
+    caseArmParser,
+    typeSchemeParser,
+    constraintParser,
+    parensConstraintParser,
+    atomMonotypeParser,
+    monotypeParser,
+    upperName,
+    lowerName,
+    typeVarParser,
+    namedTypeCtorParser,
+    termVarParser,
+    dataCtorParser,
   )
 where
 

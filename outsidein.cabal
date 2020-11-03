@@ -24,6 +24,7 @@ library
         Language.Simple.Parser
         Language.Simple.Extension
         Language.Simple.Extension.SimpleUnification
+        Language.Simple.Extension.TypeClass
         Language.Simple
 
     hs-source-dirs:   src

@@ -40,6 +40,7 @@ class Monad m => HasLocalTypeEnv x m | m -> x where
 
 class Monad m => HasProgramEnv x m | m -> x where
   lookupDataCtor :: DataCtor -> m (Maybe (DataCtorType x))
+  getAxiomSchemes :: m (Vector (AxiomScheme x))
 
 data Env x = Env
   { vars :: HashMap TermVar (TypeScheme x),
@@ -66,6 +67,7 @@ instance (Fuv (ExtensionMonotype x UniVar), Monad m) => HasLocalTypeEnv x (EnvT 
 
 instance Monad m => HasProgramEnv x (EnvT x m) where
   lookupDataCtor k = MkEnvT . asks $ HashMap.lookup k . dataCtors
+  getAxiomSchemes = MkEnvT $ asks axioms
 
 instance Monad m => Fresh (EnvT x m) where
   fresh = MkEnvT $ state f

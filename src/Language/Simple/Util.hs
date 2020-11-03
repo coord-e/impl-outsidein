@@ -12,6 +12,7 @@ module Language.Simple.Util
     logDocError,
     logPretty,
     logParamsDebug,
+    uncons,
   )
 where
 
@@ -19,6 +20,8 @@ import Control.Applicative (Alternative, optional)
 import Control.Monad.Except (MonadError (..))
 import Control.Monad.Logger (LogLevel (..), MonadLogger, logOtherN)
 import Data.Foldable (fold, foldlM)
+import Data.Vector (Vector, unsafeHead, unsafeTail)
+import qualified Data.Vector as Vector (null)
 import Prettyprinter
   ( Doc,
     Pretty (..),
@@ -77,3 +80,8 @@ logParamsDebug msg ((ht, hd) : t) = logDocDebug $ msg <> nest 2 paramsDoc
   where
     paramsDoc = sep (punctuate comma (line <> ht <> ":" <+> nest 2 hd : map f t))
     f (name, doc) = name <> ":" <+> nest 2 doc
+
+uncons :: Vector a -> Maybe (a, Vector a)
+uncons v
+  | Vector.null v = Nothing
+  | otherwise = Just (unsafeHead v, unsafeTail v)
