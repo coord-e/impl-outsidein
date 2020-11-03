@@ -74,17 +74,21 @@ parseProgram input =
     Right x -> pure x
 
 programParser :: (Extension x, TokenParsing m) => m (Program x)
-programParser = Program <$> lets <*> axiom <*> datum
+programParser = Program <$> letDecls <*> axiomDecls <*> typeDecls <*> dataDecls
   where
-    lets = manyV (textSymbol "let" *> bindingParser)
-    axiom = manyV (textSymbol "axiom" *> axiomSchemeParser)
-    datum = HashMap.fromList <$> many (textSymbol "data" *> dataCtorDeclParser)
+    letDecls = manyV (textSymbol "let" *> bindingParser)
+    axiomDecls = manyV (textSymbol "axiom" *> axiomSchemeParser)
+    typeDecls = HashMap.fromList <$> many (textSymbol "type" *> typeDeclParser)
+    dataDecls = HashMap.fromList <$> many (textSymbol "data" *> dataCtorDeclParser)
 
 axiomSchemeParser :: (Extension x, TokenParsing m) => m (AxiomScheme x)
 axiomSchemeParser = ForallAxiomScheme <$> orEmpty quant <*> orEmpty qual <*> constraintParser <?> "axiom scheme"
   where
     quant = textSymbol "forall" *> manyV typeVarParser <* dot
     qual = parensConstraintParser <* textSymbol "=>"
+
+typeDeclParser :: (Extension x, TokenParsing m) => m (TermVar, TypeScheme x)
+typeDeclParser = (,) <$> (termVarParser <* textSymbol "::") <*> typeSchemeParser
 
 dataCtorDeclParser :: (Extension x, TokenParsing m) => m (DataCtor, DataCtorType x)
 dataCtorDeclParser = (,) <$> (dataCtorParser <* textSymbol "::") <*> dataCtorTypeParser
@@ -171,7 +175,7 @@ monotypeParser = f <$> atomMonotypeParser <*> many (textSymbol "->" *> atomMonot
     f lhs ts = functionType lhs $ foldr1 functionType ts
 
 keywords :: [Text]
-keywords = ["let", "data", "case", "in", "axiom"]
+keywords = ["let", "data", "case", "in", "axiom", "type"]
 
 keyword :: TokenParsing m => Text -> m Text
 keyword x = try (text x <* notFollowedBy alphaNum) <* whiteSpace

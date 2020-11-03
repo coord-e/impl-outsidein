@@ -63,6 +63,8 @@ data Program x = Program
     -- | Sequence of top-level axiom schemes.
     -- We represent a set of schemes using sequence instead of product for brevity.
     axioms :: Vector (AxiomScheme x),
+    -- | Types of variables used to build initial type environment.
+    vars :: HashMap TermVar (TypeScheme x),
     -- | Types of data constructors.
     dataCtors :: HashMap DataCtor (DataCtorType x)
   }

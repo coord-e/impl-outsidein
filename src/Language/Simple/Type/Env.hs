@@ -74,7 +74,13 @@ instance Monad m => Fresh (EnvT x m) where
     where
       f n = (fromFreshNatural n, succ n)
 
-runEnvT :: Monad m => Vector (AxiomScheme x) -> HashMap DataCtor (DataCtorType x) -> EnvT x m a -> m a
-runEnvT axioms dataCtors (MkEnvT a) = evalStateT (runReaderT a initEnv) 0
+runEnvT ::
+  Monad m =>
+  Vector (AxiomScheme x) ->
+  HashMap TermVar (TypeScheme x) ->
+  HashMap DataCtor (DataCtorType x) ->
+  EnvT x m a ->
+  m a
+runEnvT axioms vars dataCtors (MkEnvT a) = evalStateT (runReaderT a initEnv) 0
   where
-    initEnv = Env {vars = mempty, localVars = mempty, axioms, dataCtors}
+    initEnv = Env {vars, localVars = mempty, axioms, dataCtors}

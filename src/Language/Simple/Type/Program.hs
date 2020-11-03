@@ -1,3 +1,4 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE ExplicitForAll #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -47,7 +48,7 @@ typeProgram ::
   ) =>
   Program x ->
   m ()
-typeProgram Program {bindings, axioms, dataCtors} = runEnvT axioms dataCtors $ foldr go (pure ()) bindings
+typeProgram Program {bindings, axioms, vars, dataCtors} = runEnvT axioms vars dataCtors $ foldr go (pure ()) bindings
   where
     go binding acc = do
       (x, s) <- typeBinding binding
