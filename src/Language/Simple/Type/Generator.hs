@@ -15,8 +15,7 @@ import Control.Monad (unless, when)
 import Control.Monad.Except (MonadError (..))
 import Control.Monad.Logger (MonadLogger)
 import Data.Foldable (foldlM)
-import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HashMap (empty, insert, intersection, keys, lookup, member, union)
+import qualified Data.HashMap.Strict as HashMap (intersection, keys, union)
 import qualified Data.HashSet as HashSet (delete, difference, union)
 import qualified Data.Vector as Vector (length, zip)
 import Data.Void (vacuous)
@@ -41,6 +40,8 @@ import Language.Simple.Syntax
 import Language.Simple.Type.Constraint (Fuv (..), GeneratedConstraint (..), UniVar)
 import Language.Simple.Type.Env (HasLocalTypeEnv (..), HasProgramEnv (..), HasTypeEnv (..))
 import Language.Simple.Type.Error (TypeError (..))
+import Language.Simple.Type.Substitution (Instantiator, Subst (..))
+import qualified Language.Simple.Type.Substitution as Subst (empty, insert, lookup, member)
 import Language.Simple.Util (foldMapM, orThrow, orThrowM)
 
 generateConstraint ::
@@ -88,7 +89,7 @@ generateConstraint (CaseExpr e arms) = do
       -- instantiate data constructor type
       (universalSubst, universalUniVars) <- fromBinders UniType universalVars
       (existentialSubst, _) <- fromBinders VarType existentialVars
-      subst <- compose universalSubst existentialSubst
+      subst <- composeInstantiator universalSubst existentialSubst
       constraint' <- instantiateConstraint subst constraint
       fields' <- mapM (instantiateMonotype subst) fields
       ctorArgs' <- mapM (instantiateMonotype subst . VarType) ctorArgs
@@ -154,8 +155,6 @@ instantiateTypeScheme ForallTypeScheme {vars, constraint, monotype} = do
   t <- instantiateMonotype subst monotype
   pure (t, q)
 
-newtype TypeVarSubst x = TypeVarSubst (HashMap TypeVar (Monotype x UniVar))
-
 fromBinders ::
   ( Foldable t,
     Fresh m,
@@ -164,30 +163,29 @@ fromBinders ::
   ) =>
   (a -> Monotype x UniVar) ->
   t TypeVar ->
-  m (TypeVarSubst x, [a])
-fromBinders toMonotype = foldlM f (initTypeVarSubst, [])
+  m (Instantiator x, [a])
+fromBinders toMonotype = foldlM f (Subst.empty, [])
   where
-    f (TypeVarSubst subst, vars) v = do
-      when (HashMap.member v subst) $ throwError (ConflictingTypeVars v)
+    f (subst, vars) v = do
+      when (Subst.member v subst) $ throwError (ConflictingTypeVars v)
       a <- fresh
-      pure (TypeVarSubst (HashMap.insert v (toMonotype a) subst), a : vars)
-    initTypeVarSubst = TypeVarSubst HashMap.empty
+      pure (Subst.insert v (toMonotype a) subst, a : vars)
 
-compose :: MonadError (TypeError x) m => TypeVarSubst x -> TypeVarSubst x -> m (TypeVarSubst x)
-compose (TypeVarSubst m1) (TypeVarSubst m2)
-  | null intersection = pure . TypeVarSubst $ HashMap.union m1 m2
+composeInstantiator :: MonadError (TypeError x) m => Instantiator x -> Instantiator x -> m (Instantiator x)
+composeInstantiator (Subst m1) (Subst m2)
+  | null intersection = pure . Subst $ HashMap.union m1 m2
   | otherwise = throwError . ConflictingTypeVars . head $ HashMap.keys intersection
   where
     intersection = HashMap.intersection m1 m2
 
-replace :: MonadError (TypeError x) m => TypeVarSubst x -> TypeVar -> m (Monotype x UniVar)
-replace (TypeVarSubst m) v = HashMap.lookup v m `orThrow` UnboundTypeVar v
+replace :: MonadError (TypeError x) m => Instantiator x -> TypeVar -> m (Monotype x UniVar)
+replace m v = Subst.lookup v m `orThrow` UnboundTypeVar v
 
 instantiateMonotype ::
   ( Instantiable x (Monotype x),
     MonadError (TypeError x) m
   ) =>
-  TypeVarSubst x ->
+  Instantiator x ->
   SimpleMonotype x ->
   m (Monotype x UniVar)
 instantiateMonotype = instantiate . replace
@@ -196,7 +194,7 @@ instantiateConstraint ::
   ( Instantiable x (Constraint x),
     MonadError (TypeError x) m
   ) =>
-  TypeVarSubst x ->
+  Instantiator x ->
   SimpleConstraint x ->
   m (Constraint x UniVar)
 instantiateConstraint = instantiate . replace

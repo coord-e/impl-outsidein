@@ -1,32 +1,59 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Language.Simple.Type.Substitution
   ( Subst (..),
     compose,
+    null,
+    lookup,
     empty,
+    member,
+    insert,
     singleton,
     Unifier,
+    Instantiator,
     Substitutable (..),
   )
 where
 
 import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HashMap (empty, keysSet, lookup, singleton, union)
+import qualified Data.HashMap.Strict as HashMap (empty, insert, keysSet, lookup, member, null, singleton, toList, union)
 import qualified Data.HashSet as HashSet (difference)
 import Data.Hashable (Hashable)
-import Language.Simple.Syntax (Constraint (..), ExtensionConstraint, ExtensionMonotype, Monotype (..))
+import Language.Simple.Syntax (Constraint (..), ExtensionConstraint, ExtensionMonotype, Monotype (..), TypeVar)
 import Language.Simple.Type.Constraint (GeneratedConstraint (..), UniVar)
 import Language.Simple.Util (fromJustOr)
+import Prettyprinter (Pretty (..), list, (<+>))
+import Prelude hiding (lookup, null)
 
 newtype Subst x a = Subst (HashMap a (Monotype x UniVar))
 
 type Unifier x = Subst x UniVar
 
+type Instantiator x = Subst x TypeVar
+
+instance (Pretty (ExtensionMonotype x UniVar), Pretty a) => Pretty (Subst x a) where
+  pretty (Subst m) = list . map f $ HashMap.toList m
+    where
+      f (k, v) = pretty k <+> "↦" <+> pretty v
+
 empty :: Subst x a
 empty = Subst HashMap.empty
+
+null :: Subst x a -> Bool
+null (Subst m) = HashMap.null m
+
+insert :: (Hashable a, Eq a) => a -> Monotype x UniVar -> Subst x a -> Subst x a
+insert k v (Subst m) = Subst $ HashMap.insert k v m
+
+member :: (Hashable a, Eq a) => a -> Subst x a -> Bool
+member k (Subst m) = HashMap.member k m
+
+lookup :: (Hashable a, Eq a) => a -> Subst x a -> Maybe (Monotype x UniVar)
+lookup k (Subst m) = HashMap.lookup k m
 
 singleton :: Hashable a => a -> Monotype x UniVar -> Subst x a
 singleton k v = Subst $ HashMap.singleton k v
