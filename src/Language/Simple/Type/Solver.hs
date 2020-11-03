@@ -32,17 +32,19 @@ solveConstraint ::
   GeneratedConstraint x ->
   m (Constraint x UniVar, Unifier x)
 solveConstraint given tch wanted = do
-  logParamsDebug
-    "solveConstraint"
-    [ ("given", pretty given),
-      ("tch", pretty (HashSet.toList tch)),
-      ("wanted", pretty wanted)
-    ]
   (residual, unifier) <- simplifyConstraint given tch (simple wanted)
   let residual' = reduce residual
   forM_ (implic (substitute unifier wanted)) $ \(vars, premise, c) -> do
     (q, _) <- solveConstraint (given <> residual' <> premise) vars c
     unless (isEmpty q) $ throwError (UnresolvedConstraint q)
+  logParamsDebug
+    "solveConstraint"
+    [ ("given", pretty given),
+      ("tch", pretty (HashSet.toList tch)),
+      ("wanted", pretty wanted),
+      ("(out) residual", pretty residual'),
+      ("(out) unifier", pretty unifier)
+    ]
   pure (residual', unifier)
   where
     isEmpty EmptyConstraint = True

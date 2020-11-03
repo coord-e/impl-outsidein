@@ -30,6 +30,7 @@ module Language.Simple.Syntax
     SimpleMonotype,
     ExtensionMonotype,
     functionType,
+    prettyAtomMonotype,
     TypeVar (..),
     TypeCtor (..),
     Constraint (..),
@@ -47,7 +48,7 @@ import qualified Data.Vector as Vector (fromList, toList)
 import Data.Void (Void)
 import GHC.Generics (Generic)
 import Language.Simple.Fresh (GenFresh (..))
-import Prettyprinter (Pretty (..), hsep, space, (<+>))
+import Prettyprinter (Doc, Pretty (..), hsep, parens, space, (<+>))
 import Prettyprinter.Internal (unsafeTextWithoutNewlines)
 
 data family ExtensionMonotype x :: Type -> Type
@@ -197,18 +198,17 @@ instance (Pretty (ExtensionMonotype x a), Pretty a) => Pretty (Monotype x a) whe
   pretty (VarType v) = pretty v
   pretty (UniType a) = pretty a
   pretty (ApplyType FunctionTypeCtor (Vector.toList -> [a, b]))
-    | isNested a = "(" <> pretty a <> ")" <+> "->" <+> pretty b
+    | isNested a = parens (pretty a) <+> "->" <+> pretty b
     | otherwise = pretty a <+> "->" <+> pretty b
     where
       isNested (ApplyType FunctionTypeCtor _) = True
       isNested _ = False
-  pretty (ApplyType k ts) = hsep (pretty k : map atom (Vector.toList ts))
-    where
-      atom t@(ApplyType _ ts')
-        | null ts' = pretty t
-        | otherwise = "(" <> pretty t <> ")"
-      atom t = pretty t
+  pretty (ApplyType k ts) = hsep (pretty k : map prettyAtomMonotype (Vector.toList ts))
   pretty (ExtensionType x) = pretty x
+
+prettyAtomMonotype :: (Pretty (ExtensionMonotype x a), Pretty a) => Monotype x a -> Doc ann
+prettyAtomMonotype t@(ApplyType _ ts') | not (null ts') = parens (pretty t)
+prettyAtomMonotype t = pretty t
 
 -- | Type constructor.
 data TypeCtor
@@ -273,5 +273,5 @@ instance
   where
   pretty EmptyConstraint = "ε"
   pretty (ProductConstraint q1 q2) = pretty q1 <+> "∧" <+> pretty q2
-  pretty (EqualityConstraint t1 t2) = pretty t1 <+> "~" <+> pretty t2
+  pretty (EqualityConstraint t1 t2) = prettyAtomMonotype t1 <+> "~" <+> prettyAtomMonotype t2
   pretty (ExtensionConstraint x) = pretty x

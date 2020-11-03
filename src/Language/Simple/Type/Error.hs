@@ -62,7 +62,7 @@ instance
           "but got"
             <+> pretty got
         ]
-  pretty (UnresolvedConstraint q) = vsep $ prettyUnresolvedConstraint q
+  pretty (UnresolvedConstraint q) = nest 2 . vsep $ prettyUnresolvedConstraint q
   pretty (ExtensionTypeError x) = pretty x
 
 prettyUnresolvedConstraint ::
