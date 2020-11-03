@@ -14,9 +14,9 @@ where
 import Control.Monad (unless)
 import Control.Monad.Except (MonadError (..))
 import Control.Monad.Logger (MonadLogger)
-import Control.Monad.State (get, put, runStateT)
-import Control.Monad.Trans (lift)
-import qualified Data.HashMap.Strict as HashMap (elems, empty, insert, lookup)
+import Control.Monad.State (runStateT, state)
+import qualified Data.HashMap.Strict as HashMap (elems, empty, insert, lookup, size)
+import Data.Text (Text, pack)
 import qualified Data.Vector as Vector (fromList)
 import Data.Void (vacuous)
 import Language.Simple.Extension (Extension, Generalizable (..))
@@ -30,6 +30,7 @@ import Language.Simple.Syntax
     Program (..),
     TermVar,
     TypeScheme (..),
+    TypeVar (..),
   )
 import Language.Simple.Type.Constraint (Fuv (..), GeneratedConstraint (..), UniVar)
 import Language.Simple.Type.Env (HasLocalTypeEnv (..), HasProgramEnv, HasTypeEnv (..), runEnvT)
@@ -38,6 +39,7 @@ import Language.Simple.Type.Generator (generateConstraint)
 import Language.Simple.Type.Solver (solveConstraint)
 import Language.Simple.Type.Substitution (Substitutable (..))
 import Language.Simple.Util (logDocInfo)
+import Numeric (showIntAtBase)
 import Prettyprinter (Pretty (..), nest, (<+>))
 
 typeProgram ::
@@ -95,7 +97,7 @@ typeBinding (AnnotatedBinding x s@ForallTypeScheme {constraint, monotype} e) = d
 generalizeToTypeScheme ::
   ( Generalizable x (ExtensionMonotype x),
     Generalizable x (ExtensionConstraint x),
-    Fresh m
+    Monad m
   ) =>
   Constraint x UniVar ->
   Monotype x UniVar ->
@@ -112,11 +114,18 @@ generalizeToTypeScheme q t = do
         monotype
       }
   where
-    gen u = do
-      m <- get
+    gen = state . f
+    f u m =
       case HashMap.lookup u m of
-        Just v -> pure $ VarType v
-        Nothing -> do
-          v <- lift fresh
-          put $ HashMap.insert u v m
-          pure $ VarType v
+        Just v -> (VarType v, m)
+        Nothing -> (VarType v, HashMap.insert u v m)
+          where
+            v = nextVar m
+    nextVar = TypeVar . intToName . HashMap.size
+
+intToName :: Int -> Text
+intToName i = pack str
+  where
+    str = showIntAtBase base (chars !!) i ""
+    base = toEnum (length chars)
+    chars = ['a' .. 'z']
