@@ -56,7 +56,7 @@ import Language.Simple.Syntax
     functionType,
   )
 import Language.Simple.Util (orEmpty)
-import Prettyprinter (Pretty (..))
+import Prettyprinter (Pretty (..), (<+>))
 import Text.Parser.Char (alphaNum, lower, text, upper)
 import Text.Parser.Combinators (choice, eof, notFollowedBy, optional, sepEndBy, try, (<?>))
 import Text.Parser.Token (TokenParsing, braces, comma, commaSep, dot, parens, textSymbol, whiteSpace)
@@ -65,7 +65,7 @@ data ParseError = ParseFailed !String
   deriving (Show)
 
 instance Pretty ParseError where
-  pretty (ParseFailed s) = pretty s
+  pretty (ParseFailed s) = "parse error:" <+> pretty s
 
 parseProgram :: forall x m. (Extension x, MonadError ParseError m) => Text -> m (Program x)
 parseProgram input =
