@@ -97,14 +97,14 @@ generateConstraint (CaseExpr e arms) = do
       unless (Vector.length vars == Vector.length fields) $
         throwError MismatchedNumberOfDataCtorFields {ctor = k, expected = Vector.length fields, got = Vector.length vars}
       (tBody, cBody) <- withLocalVars vars fields' $ generateConstraint body
-      -- calculate \( \delta \)
-      envFuv <- localEnvFuv
-      let delta' = (fuv tBody <> fuv cBody) `HashSet.difference` envFuv
-      let delta = foldr HashSet.delete delta' universalUniVars
-      -- produce final constraint \( C'_i \)
       let cArm =
             cBody
               <> Constraint (EqualityConstraint tBody tCase)
+      -- calculate \( \delta \)
+      envFuv <- localEnvFuv
+      let delta' = (fuv tBody <> fuv cArm) `HashSet.difference` envFuv
+      let delta = foldr HashSet.delete delta' universalUniVars
+      -- produce final constraint \( C'_i \)
       let cScrutinee = Constraint (EqualityConstraint (ApplyType ctor ctorArgs') tScrutinee)
       if isGADT existentialVars constraint
         then pure $ ExistentialGeneratedConstraint delta constraint' cArm <> cScrutinee
