@@ -1,6 +1,8 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE ExplicitForAll #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Language.Simple.Parser
@@ -57,9 +59,10 @@ import Language.Simple.Syntax
   )
 import Language.Simple.Util (orEmpty)
 import Prettyprinter (Pretty (..), (<+>))
-import Text.Parser.Char (alphaNum, lower, text, upper)
-import Text.Parser.Combinators (choice, eof, notFollowedBy, optional, sepEndBy, try, (<?>))
-import Text.Parser.Token (TokenParsing, braces, comma, commaSep, dot, parens, textSymbol, whiteSpace)
+import Text.Parser.Char (CharParsing (..), alphaNum, lower, text, upper)
+import Text.Parser.Combinators (Parsing (..), choice, eof, notFollowedBy, optional, sepEndBy, try, (<?>))
+import Text.Parser.Token (TokenParsing (..), braces, comma, commaSep, dot, parens, textSymbol, token, whiteSpace)
+import Text.Parser.Token.Style (buildSomeSpaceParser, scalaCommentStyle)
 
 data ParseError = ParseFailed !String
   deriving (Show)
@@ -69,9 +72,18 @@ instance Pretty ParseError where
 
 parseProgram :: forall x m. (Extension x, MonadError ParseError m) => Text -> m (Program x)
 parseProgram input =
-  case parseOnly (programParser <* eof) input of
+  case parseOnly (runComment (whiteSpace *> programParser <* eof)) input of
     Left err -> throwError $ ParseFailed err
     Right x -> pure x
+
+newtype Comment m a = Comment {runComment :: m a}
+  deriving newtype (Functor, Applicative, Alternative, Parsing, CharParsing)
+
+instance TokenParsing m => TokenParsing (Comment m) where
+  someSpace = buildSomeSpaceParser (Comment someSpace) scalaCommentStyle
+  nesting (Comment p) = Comment $ nesting p
+  semi = Comment semi
+  highlight h (Comment p) = Comment $ highlight h p
 
 programParser :: (Extension x, TokenParsing m) => m (Program x)
 programParser = Program <$> letDecls <*> axiomDecls <*> typeDecls <*> dataDecls
@@ -178,16 +190,16 @@ keywords :: [Text]
 keywords = ["let", "data", "case", "in", "axiom", "type"]
 
 keyword :: TokenParsing m => Text -> m Text
-keyword x = try (text x <* notFollowedBy alphaNum) <* whiteSpace
+keyword x = token . try $ text x <* notFollowedBy alphaNum
 
 lowerName :: TokenParsing m => m Text
-lowerName = fmap pack . try $ notFollowedBy anyKeyword *> name <* whiteSpace
+lowerName = fmap pack . token . try $ notFollowedBy anyKeyword *> name
   where
     name = (:) <$> lower <*> many alphaNum
     anyKeyword = choice (map keyword keywords)
 
 upperName :: TokenParsing m => m Text
-upperName = pack <$> name <* whiteSpace
+upperName = pack <$> token name
   where
     name = (:) <$> upper <*> many alphaNum
 
