@@ -33,7 +33,7 @@ import Language.Simple.Syntax
     TypeVar (..),
   )
 import Language.Simple.Type.Constraint (Fuv (..), GeneratedConstraint (..), UniVar)
-import Language.Simple.Type.Env (HasLocalTypeEnv (..), HasProgramEnv, HasTypeEnv (..), runEnvT)
+import Language.Simple.Type.Env (HasLocalTypeEnv (..), HasProgramEnv, HasTypeEnv (..), runBuiltinT, runEnvT)
 import Language.Simple.Type.Error (TypeError (..))
 import Language.Simple.Type.Generator (generateConstraint)
 import Language.Simple.Type.Solver (solveConstraint)
@@ -50,7 +50,8 @@ typeProgram ::
   ) =>
   Program x ->
   m ()
-typeProgram Program {bindings, axioms, vars, dataCtors} = runEnvT axioms vars dataCtors $ foldr go (pure ()) bindings
+typeProgram Program {bindings, axioms, vars, dataCtors} =
+  runEnvT axioms vars dataCtors . runBuiltinT $ foldr go (pure ()) bindings
   where
     go binding acc = do
       (x, s) <- typeBinding binding

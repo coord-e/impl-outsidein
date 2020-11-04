@@ -27,6 +27,7 @@ module Language.Simple.Parser
     namedTypeCtorParser,
     termVarParser,
     dataCtorParser,
+    namedDataCtorParser,
   )
 where
 
@@ -65,7 +66,18 @@ import Lens.Micro.Mtl ((%=))
 import Prettyprinter (Pretty (..), (<+>))
 import Text.Parser.Char (CharParsing (..), alphaNum, lower, text, upper)
 import Text.Parser.Combinators (Parsing (..), choice, eof, notFollowedBy, optional, sepEndBy, try, (<?>))
-import Text.Parser.Token (TokenParsing (..), braces, comma, commaSep, dot, parens, textSymbol, token, whiteSpace)
+import Text.Parser.Token
+  ( TokenParsing (..),
+    braces,
+    comma,
+    commaSep,
+    dot,
+    integer,
+    parens,
+    textSymbol,
+    token,
+    whiteSpace,
+  )
 import Text.Parser.Token.Style (buildSomeSpaceParser, scalaCommentStyle)
 
 data ParseError = ParseFailed !String
@@ -222,8 +234,11 @@ termVarParser = TermVar <$> lowerName <?> "variable"
 namedTypeCtorParser :: TokenParsing m => m TypeCtor
 namedTypeCtorParser = NamedTypeCtor <$> upperName <?> "type constructor"
 
+namedDataCtorParser :: TokenParsing m => m DataCtor
+namedDataCtorParser = NamedDataCtor <$> upperName
+
 dataCtorParser :: TokenParsing m => m DataCtor
-dataCtorParser = DataCtor <$> upperName <?> "data constructor"
+dataCtorParser = IntegerDataCtor <$> integer <|> namedDataCtorParser <?> "data constructor"
 
 manyV :: Alternative m => m a -> m (Vector a)
 manyV = fmap Vector.fromList . many

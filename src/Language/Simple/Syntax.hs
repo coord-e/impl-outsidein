@@ -145,13 +145,15 @@ instance Pretty TermVar where
   pretty (TermVar x) = unsafeTextWithoutNewlines x
 
 -- | Data constructor.
-newtype DataCtor = DataCtor Text
-  deriving stock (Ord, Eq, Generic)
-  deriving newtype (Show)
+data DataCtor
+  = NamedDataCtor Text
+  | IntegerDataCtor Integer
+  deriving stock (Show, Ord, Eq, Generic)
   deriving anyclass (Hashable)
 
 instance Pretty DataCtor where
-  pretty (DataCtor k) = unsafeTextWithoutNewlines k
+  pretty (NamedDataCtor k) = unsafeTextWithoutNewlines k
+  pretty (IntegerDataCtor i) = pretty i
 
 -- | Type scheme.
 data TypeScheme x = ForallTypeScheme

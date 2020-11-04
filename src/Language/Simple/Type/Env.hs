@@ -4,6 +4,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -13,6 +14,8 @@ module Language.Simple.Type.Env
     HasProgramEnv (..),
     EnvT,
     runEnvT,
+    BuiltinT,
+    runBuiltinT,
   )
 where
 
@@ -25,7 +28,16 @@ import qualified Data.HashMap.Strict as HashMap (insert, lookup)
 import Data.HashSet (HashSet)
 import Data.Vector (Vector)
 import Language.Simple.Fresh (Fresh (..), fromFreshNatural)
-import Language.Simple.Syntax (AxiomScheme, DataCtor, DataCtorType, ExtensionMonotype, Monotype, TermVar, TypeScheme)
+import Language.Simple.Syntax
+  ( AxiomScheme,
+    DataCtor (..),
+    DataCtorType (..),
+    ExtensionMonotype,
+    Monotype,
+    TermVar,
+    TypeCtor (..),
+    TypeScheme,
+  )
 import Language.Simple.Type.Constraint (Fuv (..), UniVar)
 import Numeric.Natural (Natural)
 
@@ -84,3 +96,19 @@ runEnvT ::
 runEnvT axioms vars dataCtors (MkEnvT a) = evalStateT (runReaderT a initEnv) 0
   where
     initEnv = Env {vars, localVars = mempty, axioms, dataCtors}
+
+intDataCtorType :: DataCtorType x
+intDataCtorType = DataCtorType mempty mempty mempty mempty (NamedTypeCtor "Int") mempty
+
+boolDataCtorType :: DataCtorType x
+boolDataCtorType = DataCtorType mempty mempty mempty mempty (NamedTypeCtor "Bool") mempty
+
+newtype BuiltinT m a = BuiltinT {runBuiltinT :: m a}
+  deriving newtype (Functor, Applicative, Monad, Fresh, MonadLogger, MonadError e, HasLocalTypeEnv x, HasTypeEnv x)
+
+instance HasProgramEnv x m => HasProgramEnv x (BuiltinT m) where
+  lookupDataCtor (NamedDataCtor "True") = pure $ Just boolDataCtorType
+  lookupDataCtor (NamedDataCtor "False") = pure $ Just boolDataCtorType
+  lookupDataCtor (IntegerDataCtor _) = pure $ Just intDataCtorType
+  lookupDataCtor k = BuiltinT $ lookupDataCtor k
+  getAxiomSchemes = BuiltinT $ getAxiomSchemes
