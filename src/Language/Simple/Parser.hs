@@ -31,7 +31,9 @@ module Language.Simple.Parser
 where
 
 import Control.Applicative (Alternative (..))
+import Control.Monad (MonadPlus (..))
 import Control.Monad.Except (MonadError (..))
+import Control.Monad.State (execStateT)
 import Data.Attoparsec.Text (parseOnly)
 import Data.Foldable (foldl')
 import qualified Data.HashMap.Strict as HashMap (fromList)
@@ -58,6 +60,8 @@ import Language.Simple.Syntax
     functionType,
   )
 import Language.Simple.Util (orEmpty)
+import Lens.Micro (_1, _2, _3, _4)
+import Lens.Micro.Mtl ((%=))
 import Prettyprinter (Pretty (..), (<+>))
 import Text.Parser.Char (CharParsing (..), alphaNum, lower, text, upper)
 import Text.Parser.Combinators (Parsing (..), choice, eof, notFollowedBy, optional, sepEndBy, try, (<?>))
@@ -77,7 +81,7 @@ parseProgram input =
     Right x -> pure x
 
 newtype Comment m a = Comment {runComment :: m a}
-  deriving newtype (Functor, Applicative, Alternative, Parsing, CharParsing)
+  deriving newtype (Functor, Applicative, Alternative, Monad, MonadPlus, Parsing, CharParsing)
 
 instance TokenParsing m => TokenParsing (Comment m) where
   someSpace = buildSomeSpaceParser (Comment someSpace) scalaCommentStyle
@@ -85,13 +89,19 @@ instance TokenParsing m => TokenParsing (Comment m) where
   semi = Comment semi
   highlight h (Comment p) = Comment $ highlight h p
 
-programParser :: (Extension x, TokenParsing m) => m (Program x)
-programParser = Program <$> letDecls <*> axiomDecls <*> typeDecls <*> dataDecls
+programParser :: (Extension x, MonadPlus m, TokenParsing m) => m (Program x)
+programParser = makeProgram <$> execStateT (many toplevel) mempty
   where
-    letDecls = manyV (textSymbol "let" *> bindingParser)
-    axiomDecls = manyV (textSymbol "axiom" *> axiomSchemeParser)
-    typeDecls = HashMap.fromList <$> many (textSymbol "type" *> typeDeclParser)
-    dataDecls = HashMap.fromList <$> many (textSymbol "data" *> dataCtorDeclParser)
+    toplevel =
+      choice
+        [ textSymbol "let" *> bindingParser >>= cons _1,
+          textSymbol "axiom" *> axiomSchemeParser >>= cons _2,
+          textSymbol "type" *> typeDeclParser >>= cons _3,
+          textSymbol "data" *> dataCtorDeclParser >>= cons _4
+        ]
+    cons l x = l %= (x :)
+    makeProgram (b, a, v, d) =
+      Program (Vector.fromList b) (Vector.fromList a) (HashMap.fromList v) (HashMap.fromList d)
 
 axiomSchemeParser :: (Extension x, TokenParsing m) => m (AxiomScheme x)
 axiomSchemeParser = ForallAxiomScheme <$> orEmpty quant <*> orEmpty qual <*> constraintParser <?> "axiom scheme"

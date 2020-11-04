@@ -55,7 +55,9 @@ library
         parsers ^>=0.12,
         attoparsec ^>=0.13,
         monad-logger ^>=0.3,
-        prettyprinter ^>=1.7
+        prettyprinter ^>=1.7,
+        microlens ^>=0.4,
+        microlens-mtl ^>=0.2
 
 executable outsidein
     main-is:          Main.hs
