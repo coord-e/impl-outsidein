@@ -9,6 +9,7 @@ homepage:        https://github.com/coord-e/outsidein
 bug-reports:     https://github.com/coord-e/outsidein/issues
 synopsis:        Toy implementation of OutsideIn(X)
 description:     Toy implementation of OutsideIn(X).
+build-type:      Simple
 extra-doc-files:
     README.md
     CHANGELOG.md
