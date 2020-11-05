@@ -1,0 +1,46 @@
+on: [push, pull_request]
+
+name: CI
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-16.04
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/setup-haskell@v1.1
+        with:
+          ghc-version: '8.10.1'
+          cabal-version: '3.2'
+      - run: cabal new-update
+      - run: cabal new-test
+  hlint:
+    name: lint .hs
+    runs-on: ubuntu-16.04
+    steps:
+      - uses: actions/checkout@master
+      - name: setup HLint
+        run: |
+          curl -fsSLo ./hlint.tar.gz https://github.com/ndmitchell/hlint/releases/download/v3.2.1/hlint-3.2.1-x86_64-linux.tar.gz
+          tar --strip-components=1 -x hlint-3.2.1/hlint -f ./hlint.tar.gz
+      - run: ./hlint --git
+  hs-fmt:
+    name: check .hs style
+    runs-on: ubuntu-16.04
+    steps:
+      - uses: actions/checkout@master
+      - name: setup Ormolu
+        run: |
+          curl -fsSLo ./ormolu https://github.com/tweag/ormolu/releases/download/0.1.3.0/ormolu-Linux
+          chmod +x ./ormolu
+      - run: ./ormolu --mode check $(find . -name '*.hs')
+  cabal-fmt:
+    name: check .cabal style
+    runs-on: ubuntu-16.04
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/setup-haskell@v1.1
+        with:
+          cabal-version: '3.2'
+      - run: cabal format
+      - run: git diff --exit-code
