@@ -1,2 +1,10 @@
 cradle:
   cabal:
+    - path: "src"
+      component: "lib:outsidein"
+
+    - path: "app"
+      component: "outsidein:exe:outsidein"
+
+    - path: "test"
+      component: "outsidein:test:test"
