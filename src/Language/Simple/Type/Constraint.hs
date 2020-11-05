@@ -14,6 +14,7 @@ module Language.Simple.Type.Constraint
     simple,
     implic,
     reduce,
+    isEmpty,
     Fuv (..),
   )
 where
@@ -62,6 +63,10 @@ reduce (ProductConstraint q1 q2) = reduce1 (ProductConstraint (reduce q1) (reduc
     reduce1 (ProductConstraint q EmptyConstraint) = q
     reduce1 q = q
 reduce q = q
+
+isEmpty :: Constraint x a -> Bool
+isEmpty EmptyConstraint = True
+isEmpty _ = False
 
 instance Semigroup (GeneratedConstraint x) where
   (<>) = ProductGeneratedConstraint

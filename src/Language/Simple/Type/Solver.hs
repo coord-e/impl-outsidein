@@ -15,7 +15,7 @@ import qualified Data.HashSet as HashSet (toList)
 import Language.Simple.Extension (Extension (..))
 import Language.Simple.Fresh (Fresh)
 import Language.Simple.Syntax (Constraint (..))
-import Language.Simple.Type.Constraint (GeneratedConstraint (..), UniVar, implic, reduce, simple)
+import Language.Simple.Type.Constraint (GeneratedConstraint (..), UniVar, implic, isEmpty, reduce, simple)
 import Language.Simple.Type.Env (HasProgramEnv)
 import Language.Simple.Type.Error (TypeError (..))
 import Language.Simple.Type.Substitution (Substitutable (..), Unifier)
@@ -48,6 +48,3 @@ solveConstraint given tch wanted = do
       ("(out) unifier", pretty unifier)
     ]
   pure (residual', unifier)
-  where
-    isEmpty EmptyConstraint = True
-    isEmpty _ = False

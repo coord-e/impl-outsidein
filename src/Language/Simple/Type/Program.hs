@@ -32,7 +32,7 @@ import Language.Simple.Syntax
     TypeScheme (..),
     TypeVar (..),
   )
-import Language.Simple.Type.Constraint (Fuv (..), GeneratedConstraint (..), UniVar)
+import Language.Simple.Type.Constraint (Fuv (..), GeneratedConstraint (..), UniVar, isEmpty)
 import Language.Simple.Type.Env (HasLocalTypeEnv (..), HasProgramEnv, HasTypeEnv (..), runBuiltinT, runEnvT)
 import Language.Simple.Type.Error (TypeError (..))
 import Language.Simple.Type.Generator (generateConstraint)
@@ -77,6 +77,7 @@ typeBinding (UnannotatedBinding x e) = do
   let tch = fuv t <> fuv c'
   (q, u) <- solveConstraint mempty tch c'
   let t' = substitute u t
+  unless (isEmpty q || not (null (fuv q))) $ throwError (UnresolvedConstraint q)
   -- Generalize
   s <- generalizeToTypeScheme q t'
   logDocInfo $ "typed unannotated binding" <+> pretty x <+> "::" <+> nest 2 (pretty s)
@@ -91,9 +92,6 @@ typeBinding (AnnotatedBinding x s@ForallTypeScheme {constraint, monotype} e) = d
   unless (isEmpty q) $ throwError (UnresolvedConstraint q)
   logDocInfo $ "typed annotated binding" <+> pretty x <+> "::" <+> nest 2 (pretty s)
   pure (x, s)
-  where
-    isEmpty EmptyConstraint = True
-    isEmpty _ = False
 
 generalizeToTypeScheme ::
   ( Generalizable x (ExtensionMonotype x),
