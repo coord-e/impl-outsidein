@@ -1,0 +1,6 @@
+// simple,class
+
+// this doesn't typecheck in GHC
+// let x :: (Int ~ Bool) => Bool = 1
+
+let y :: forall a. (a ~ Bool) => a = True

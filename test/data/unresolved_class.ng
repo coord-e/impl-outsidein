@@ -1,0 +1,10 @@
+// class
+
+data Pair :: forall a b. a -> b -> Pair a b
+
+type eq :: forall a. (Eq a) => a -> a -> Bool
+
+axiom Eq Int
+axiom forall a b. (Eq a, Eq b) => Eq (Pair a b)
+
+let pair = eq (Pair 1 True) (Pair 2 False)

@@ -1,0 +1,14 @@
+// simple, class
+
+data Z :: Z
+data S :: forall n. n -> S n
+
+data SZ :: forall a. (a ~ Z) => SNat a
+data SS :: forall a n. (a ~ S n) => SNat n -> SNat a
+
+let two = SS (SS SZ)
+let num :: forall n. SNat n -> n = \x.
+  case x {
+    SZ => Z,
+    SS n => S (num n),
+  }

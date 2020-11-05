@@ -1,0 +1,10 @@
+// simple, class
+// §5.1
+
+data T1 :: forall a. (Bool ~ a) => Int -> T a
+type gt :: Int -> Int -> Bool
+
+let f =
+  \x. case x {
+    T1 n => gt 0 n,
+  }

@@ -1,0 +1,7 @@
+// class
+// §6.1
+
+type show :: forall a. (Show a) => a -> String
+type read :: forall a. (Show a) => String -> a
+
+let flop :: String -> String = \s. show (read s)

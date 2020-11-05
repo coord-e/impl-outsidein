@@ -1,0 +1,15 @@
+// class
+// §4.1
+
+data MkSet :: forall a. (Ord a) => List a -> Set a
+data Nil :: forall a. List a
+
+type merge :: forall a. (Ord a) => List a -> List a -> List a
+
+let empty :: forall a. (Ord a) => Set a = MkSet Nil
+let union :: Set a -> Set a -> Set a = \s1. \s2.
+  case s1 {
+    MkSet xs1 => case s2 {
+      MkSet xs2 => MkSet (merge xs1 xs2)
+    }
+  }

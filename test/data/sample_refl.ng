@@ -1,0 +1,4 @@
+// simple, class
+
+data Refl :: forall a b. (a ~ b) => Eq a b
+let irrefl :: Eq Int Bool = Refl

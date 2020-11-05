@@ -1,0 +1,12 @@
+// simple, class
+
+data Refl :: forall a b. (a ~ b) => Eq a b
+
+let coerce :: forall a b. Eq a b -> a -> b
+  = \x. \a. case x { Refl => a }
+
+let sym :: forall a b. Eq a b -> Eq b a
+  = \x. case x { Refl => Refl }
+
+let trans :: forall a b c. Eq a b -> Eq b c -> Eq a c
+  = \x. \y. case x { Refl => case y { Refl => Refl } }

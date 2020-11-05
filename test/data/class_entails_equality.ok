@@ -1,0 +1,6 @@
+// class
+
+axiom forall a b. (a ~ b) => Eqc a b
+type coerce :: forall a b. (Eqc a b) => a -> b
+
+let one = coerce 1

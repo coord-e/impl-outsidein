@@ -1,0 +1,15 @@
+// class
+
+data Pair :: forall a b. a -> b -> Pair a b
+data Showable :: exists a. (Show a) => a -> Showable
+
+axiom Show Bool
+axiom forall a b. (Show a, Show b) => Show (Pair a b)
+
+type show :: forall a. (Show a) => a -> String
+
+let showable :: Showable = Showable (Pair False False)
+let display :: Showable -> String =
+  \x. case x {
+    Showable a => show a,
+  }

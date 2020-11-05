@@ -75,3 +75,24 @@ executable outsidein
         monad-logger ^>=0.3,
         prettyprinter ^>=1.7,
         outsidein -any
+
+test-suite test
+    type:             exitcode-stdio-1.0
+    main-is:          Test.hs
+    hs-source-dirs:   test
+    default-language: Haskell2010
+    ghc-options:
+        -Wall -Werror -Wcompat -Wincomplete-record-updates
+        -Wincomplete-uni-patterns -Wnoncanonical-monad-instances
+
+    build-depends:
+        base ^>=4.14.1.0,
+        text ^>=1.2,
+        prettyprinter ^>=1.7,
+        directory ^>=1.3,
+        filepath ^>=1.4,
+        tasty ^>=1.4,
+        monad-logger ^>=0.3,
+        mtl ^>=2.2,
+        tasty-hunit ^>=0.10,
+        outsidein -any

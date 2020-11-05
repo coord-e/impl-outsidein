@@ -1,0 +1,7 @@
+// class
+
+type fromInt :: forall a. (Num a) => Int -> a
+type toInt :: forall a. (Num a) => a -> Int
+
+let x :: (Num Bool) => Bool = fromInt 1
+let y :: (Num Bool) => Int = toInt True

@@ -1,0 +1,4 @@
+// simple, class
+
+type print :: Int -> Unit
+let x = print True
