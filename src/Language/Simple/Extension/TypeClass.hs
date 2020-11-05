@@ -8,9 +8,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module Language.Simple.Extension.TypeClass
@@ -72,8 +70,11 @@ classParser = Class <$> upperName
 
 data instance ExtensionMonotype X a
 
+-- hlint can't parse EmptyCase without {}
+{- ORMOLU_DISABLE -}
 discardMonotypeExt :: ExtensionMonotype X a -> b
-discardMonotypeExt x = case x of
+discardMonotypeExt x = case x of {}
+{- ORMOLU_ENABLE -}
 
 instance Functor (ExtensionMonotype X) where
   fmap _ = discardMonotypeExt
@@ -218,8 +219,8 @@ instantiateClassAxiomScheme ::
   m (Constraint X UniVar, ExtensionConstraint X UniVar)
 instantiateClassAxiomScheme vars constraint head = do
   instantiator <- fromBinders vars
-  c <- instantiate (replace instantiator) $ constraint
-  h <- instantiate (replace instantiator) $ head
+  c <- instantiate (replace instantiator) constraint
+  h <- instantiate (replace instantiator) head
   pure (c, h)
   where
     fromBinders = foldlM go Subst.empty

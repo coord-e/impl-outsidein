@@ -111,4 +111,4 @@ instance HasProgramEnv x m => HasProgramEnv x (BuiltinT m) where
   lookupDataCtor (NamedDataCtor "False") = pure $ Just boolDataCtorType
   lookupDataCtor (IntegerDataCtor _) = pure $ Just intDataCtorType
   lookupDataCtor k = BuiltinT $ lookupDataCtor k
-  getAxiomSchemes = BuiltinT $ getAxiomSchemes
+  getAxiomSchemes = BuiltinT getAxiomSchemes

@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE EmptyCase #-}
@@ -47,8 +46,11 @@ type X = SimpleUnification
 
 data instance ExtensionMonotype X a
 
+-- hlint can't parse EmptyCase without {}
+{- ORMOLU_DISABLE -}
 discardMonotypeExt :: ExtensionMonotype X a -> b
-discardMonotypeExt x = case x of
+discardMonotypeExt x = case x of {}
+{- ORMOLU_ENABLE -}
 
 instance Functor (ExtensionMonotype X) where
   fmap _ = discardMonotypeExt
@@ -73,8 +75,11 @@ instance SyntaxExtension X (ExtensionMonotype X) where
 
 data instance ExtensionConstraint X a
 
+-- ditto
+{- ORMOLU_DISABLE -}
 discardConstraintExt :: ExtensionConstraint X a -> b
-discardConstraintExt x = case x of
+discardConstraintExt x = case x of {}
+{- ORMOLU_ENABLE -}
 
 instance Functor (ExtensionConstraint X) where
   fmap _ = discardConstraintExt
