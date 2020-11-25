@@ -146,10 +146,11 @@ simplifyUnificationConstraint given tch wanted = solve $ substitute givenSubst w
         (r2, s2) = solve (substitute s1 q2)
     unify (UniType u1) (UniType u2) | u1 == u2 = (mempty, Subst.empty)
     unify (VarType v1) (VarType v2) | v1 == v2 = (mempty, Subst.empty)
-    unify (UniType u) t | HashSet.member u tch = (mempty, Subst.singleton u t)
-    unify t (UniType u) | HashSet.member u tch = (mempty, Subst.singleton u t)
+    unify (UniType u) t | check u t = (mempty, Subst.singleton u t)
+    unify t (UniType u) | check u t = (mempty, Subst.singleton u t)
     unify (ApplyType k1 ts1) (ApplyType k2 ts2) | k1 == k2 = unifyAll ts1 ts2
     unify t1 t2 = (EqualityConstraint t1 t2, Subst.empty)
+    check u t = HashSet.member u tch && not (HashSet.member u (fuv t))
     unifyAll xs ys = foldr go (mempty, Subst.empty) (Vector.zip xs ys)
       where
         go (x, y) (c, s1) =
