@@ -22,7 +22,6 @@ import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet (delete, member)
 import Data.Hashable (Hashable)
 import qualified Data.Vector as Vector (zip)
-import Data.Void (Void)
 import GHC.Generics (Generic)
 import Language.Simple.Extension
   ( Extension (..),
@@ -102,7 +101,13 @@ instance Substitutable X UniVar (ExtensionConstraint X a) where
 instance SyntaxExtension X (ExtensionConstraint X) where
   extensionParser = empty
 
-type instance ExtensionTypeError X = Void
+data instance ExtensionTypeError X
+
+-- ditto
+{- ORMOLU_DISABLE -}
+instance Pretty (ExtensionTypeError X) where
+  pretty x = case x of {}
+{- ORMOLU_ENABLE -}
 
 instance Extension X where
   simplifyConstraint given tch wanted = pure $ simplifyUnificationConstraint given tch wanted

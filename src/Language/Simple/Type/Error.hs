@@ -25,7 +25,7 @@ import Language.Simple.Syntax
 import Language.Simple.Type.Constraint (UniVar)
 import Prettyprinter (Doc, Pretty (..), dquotes, nest, sep, squotes, vsep, (<+>))
 
-type family ExtensionTypeError x
+data family ExtensionTypeError x
 
 data TypeError x
   = UnboundTermVar TermVar

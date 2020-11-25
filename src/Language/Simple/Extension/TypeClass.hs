@@ -123,7 +123,13 @@ instance SyntaxExtension X (ExtensionConstraint X) where
     where
       manyV = fmap Vector.fromList . many
 
-type instance ExtensionTypeError X = Void
+data instance ExtensionTypeError X
+
+-- ditto
+{- ORMOLU_DISABLE -}
+instance Pretty (ExtensionTypeError X) where
+  pretty x = case x of {}
+{- ORMOLU_ENABLE -}
 
 instance Extension X where
   simplifyConstraint given tch initWanted = solve initWantedU initWantedC Subst.empty
