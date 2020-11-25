@@ -17,6 +17,7 @@ import Data.Text (Text)
 import Language.Simple.Extension (Extension)
 import Language.Simple.Extension.SimpleUnification (SimpleUnification)
 import Language.Simple.Extension.TypeClass (TypeClass)
+import Language.Simple.Extension.TypeClassTypeFamily (TypeClassTypeFamily)
 import qualified Language.Simple.Parser as Parser (parseProgram)
 import Language.Simple.Syntax (Program)
 import qualified Language.Simple.Type as Type (typeProgram)
@@ -43,10 +44,17 @@ instance NamedExtension SimpleUnification where
 instance NamedExtension TypeClass where
   extensionName = "class"
 
+instance NamedExtension TypeClassTypeFamily where
+  extensionName = "class_family"
+
 data PackedExtension = forall x. NamedExtension x => PackedExtension (Proxy x)
 
 availableExtensions :: [PackedExtension]
-availableExtensions = [PackedExtension (Proxy @SimpleUnification), PackedExtension (Proxy @TypeClass)]
+availableExtensions =
+  [ PackedExtension (Proxy @SimpleUnification),
+    PackedExtension (Proxy @TypeClass),
+    PackedExtension (Proxy @TypeClassTypeFamily)
+  ]
 
 getExtension :: String -> Maybe PackedExtension
 getExtension name = find f availableExtensions

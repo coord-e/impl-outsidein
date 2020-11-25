@@ -15,6 +15,7 @@ module Language.Simple.Extension
 where
 
 import Control.Monad.Except (MonadError)
+import Control.Monad.Logger (MonadLogger)
 import Data.HashSet (HashSet)
 import Data.Void (Void)
 import Language.Simple.Fresh (Fresh)
@@ -35,6 +36,7 @@ class
   where
   simplifyConstraint ::
     ( Fresh m,
+      MonadLogger m,
       HasProgramEnv x m,
       MonadError (TypeError x) m
     ) =>

@@ -1,4 +1,4 @@
-// class
+// class, class_family
 
 type fromInt :: forall a. (Num a) => Int -> a
 type toInt :: forall a. (Num a) => a -> Int

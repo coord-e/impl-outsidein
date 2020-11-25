@@ -1,4 +1,4 @@
-// simple, class
+// simple, class, class_family
 
 data Z :: Z
 data S :: forall n. n -> S n

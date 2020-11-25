@@ -13,6 +13,7 @@ import qualified Data.Text.IO as Text (readFile)
 import Language.Simple.Extension (Extension)
 import Language.Simple.Extension.SimpleUnification (SimpleUnification)
 import Language.Simple.Extension.TypeClass (TypeClass)
+import Language.Simple.Extension.TypeClassTypeFamily (TypeClassTypeFamily)
 import Language.Simple.Parser (parseProgram)
 import Language.Simple.Type (typeProgram)
 import Prettyprinter (Pretty (..), defaultLayoutOptions, layoutPretty)
@@ -34,6 +35,7 @@ makeTestForFile path = do
     extractExtensions = map Text.strip . Text.splitOn "," . Text.drop 2 . Text.takeWhile (/= '\n')
     toTest "simple" = testCase "simple" . test @SimpleUnification isOk
     toTest "class" = testCase "class" . test @TypeClass isOk
+    toTest "class_family" = testCase "class_family" . test @TypeClassTypeFamily isOk
     toTest ext = error $ "unknown extension" ++ show ext
 
 test :: forall x. Extension x => Bool -> Text -> Assertion

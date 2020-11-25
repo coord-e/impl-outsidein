@@ -1,4 +1,4 @@
-// simple,class
+// simple, class, class_family
 
 // this doesn't typecheck in GHC
 // let x :: (Int ~ Bool) => Bool = 1

@@ -1,0 +1,40 @@
+// class_family
+
+data Z :: Z
+data S :: forall n. n -> S n
+
+axiom forall m. <Add Z m> ~ m
+axiom forall n m. <Add (S n) m> ~ S <Add n m>
+
+data SZ :: forall a. (a ~ Z) => SNat a
+data SS :: forall a n. (a ~ S n) => SNat n -> SNat a
+
+data Refl :: forall a b. (a ~ b) => Eq a b
+
+let plusComm :: forall a b. SNat a -> SNat b -> Eq <Add a b> <Add b a>
+  = \n. \m. case n {
+    SZ => case plusZRight m {
+      Refl => Refl
+    },
+    SS n2 => case plusSRight m n2 {
+      Refl => case plusComm n2 m {
+        Refl => Refl
+      }
+    }
+  }
+
+let plusZRight :: forall a. SNat a -> Eq <Add a Z> a
+  = \n. case n {
+    SZ => Refl,
+    SS m => case plusZRight m {
+      Refl => Refl
+    }
+  }
+
+let plusSRight :: forall a b. SNat a -> SNat b -> Eq <Add a (S b)> (S <Add a b>)
+  = \n. \m. case n {
+    SZ => Refl,
+    SS n2 => case plusSRight n2 m {
+      Refl => Refl
+    }
+  }

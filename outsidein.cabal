@@ -26,6 +26,7 @@ library
         Language.Simple.Extension
         Language.Simple.Extension.SimpleUnification
         Language.Simple.Extension.TypeClass
+        Language.Simple.Extension.TypeClassTypeFamily
         Language.Simple
 
     hs-source-dirs:   src
@@ -35,6 +36,13 @@ library
         Language.Simple.Type.Env
         Language.Simple.Type.Program
         Language.Simple.Type.Generator
+        Language.Simple.Extension.TypeClassTypeFamily.Extension
+        Language.Simple.Extension.TypeClassTypeFamily.Canonicalize
+        Language.Simple.Extension.TypeClassTypeFamily.Solver
+        Language.Simple.Extension.TypeClassTypeFamily.Syntax
+        Language.Simple.Extension.TypeClassTypeFamily.Interact
+        Language.Simple.Extension.TypeClassTypeFamily.Simplify
+        Language.Simple.Extension.TypeClassTypeFamily.TopReact
         Language.Simple.Type.Constraint
         Language.Simple.Type.Solver
         Language.Simple.Type.Error
@@ -53,6 +61,7 @@ library
         vector ^>=0.12,
         text ^>=1.2,
         mtl ^>=2.2,
+        transformers ^>=0.5,
         parsers ^>=0.12,
         attoparsec ^>=0.13,
         monad-logger ^>=0.3,

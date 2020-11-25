@@ -1,0 +1,8 @@
+// class_family
+
+data Refl :: forall a b. (a ~ b) => Eq a b
+
+axiom forall a. <F (List a)> ~ List (<F a>)
+axiom <F Int> ~ Bool
+
+let refl1 :: Eq <F (List Int)> (List Bool) = Refl

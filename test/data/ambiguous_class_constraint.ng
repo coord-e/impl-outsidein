@@ -1,4 +1,4 @@
-// class
+// class, class_family
 // §6.1
 
 type show :: forall a. (Show a) => a -> String

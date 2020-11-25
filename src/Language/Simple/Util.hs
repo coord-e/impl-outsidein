@@ -5,6 +5,7 @@ module Language.Simple.Util
     orThrowM,
     foldMapM,
     orEmpty,
+    firstJust,
     fromJustOr,
     logDocDebug,
     logDocInfo,
@@ -13,13 +14,16 @@ module Language.Simple.Util
     logPretty,
     logParamsDebug,
     uncons,
+    findDuplicate,
   )
 where
 
 import Control.Applicative (Alternative, optional)
 import Control.Monad.Except (MonadError (..))
 import Control.Monad.Logger (LogLevel (..), MonadLogger, logOtherN)
-import Data.Foldable (fold, foldlM)
+import Data.Foldable (fold, foldl', foldlM)
+import qualified Data.HashSet as HashSet (insert, member)
+import Data.Hashable (Hashable)
 import Data.Vector (Vector, unsafeHead, unsafeTail)
 import qualified Data.Vector as Vector (null)
 import Prettyprinter
@@ -53,6 +57,12 @@ foldMapM f = foldlM g mempty
       w <- f x
       pure $ acc <> w
 
+firstJust :: Foldable f => (a -> Maybe b) -> f a -> Maybe b
+firstJust f = foldl' go Nothing
+  where
+    go Nothing x = f x
+    go (Just x) _ = Just x
+
 orEmpty :: (Alternative f, Monoid a) => f a -> f a
 orEmpty a = fold <$> optional a
 
@@ -85,3 +95,11 @@ uncons :: Vector a -> Maybe (a, Vector a)
 uncons v
   | Vector.null v = Nothing
   | otherwise = Just (unsafeHead v, unsafeTail v)
+
+findDuplicate :: (Eq a, Hashable a, Foldable f) => f a -> Maybe a
+findDuplicate = snd . foldr go (mempty, Nothing)
+  where
+    go _ (acc, Just x) = (acc, Just x)
+    go x (found, Nothing)
+      | HashSet.member x found = (found, Just x)
+      | otherwise = (HashSet.insert x found, Nothing)

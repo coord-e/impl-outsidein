@@ -1,4 +1,4 @@
-// class
+// class, class_family
 // §4.1
 
 data MkSet :: forall a. (Ord a) => List a -> Set a

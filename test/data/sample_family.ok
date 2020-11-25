@@ -1,0 +1,9 @@
+// class_family
+// §7.2
+
+axiom <F (List Int)> ~ Int
+axiom forall a. <G (List a)> ~ Bool
+
+type g :: forall b. b -> <G b>
+
+let f :: forall a. (a ~ List <F a>) => a -> Bool = \x. g x
