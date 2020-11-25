@@ -172,10 +172,11 @@ instance Substitutable X SomeVar (GeneratedConstraint X) where
       go (UniSomeVar u) _ = HashSet.delete u
       go _ _ = id
 
-instance Substitutable X SomeVar (Constraint X UniVar) where
-  substitute _ EmptyConstraint = EmptyConstraint
-  substitute s (ProductConstraint q1 q2) = ProductConstraint (substitute s q1) (substitute s q2)
-  substitute s (EqualityConstraint t1 t2) = EqualityConstraint (substitute s t1) (substitute s t2)
+instance Substitutable X SomeVar (ExtensionConstraint X UniVar) where
+  substitute _ = discardConstraintExt
+
+instance Substitutable X SomeVar (ExtensionMonotype X UniVar) where
+  substitute _ = discardMonotypeExt
 
 instance Substitutable X SomeVar (Monotype X UniVar) where
   substitute (Subst s) (VarType v) = HashMap.lookup (RigidSomeVar v) s `fromJustOr` VarType v

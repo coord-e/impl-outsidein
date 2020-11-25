@@ -15,7 +15,7 @@ import Control.Monad (unless, when)
 import Control.Monad.Except (MonadError (..))
 import Control.Monad.Logger (MonadLogger)
 import Data.Foldable (foldlM)
-import qualified Data.HashMap.Strict as HashMap (intersection, keys, union)
+import qualified Data.HashMap.Strict as HashMap (insert, intersection, keys, member, union)
 import qualified Data.HashSet as HashSet (delete, difference, union)
 import qualified Data.Vector as Vector (length, zip)
 import Data.Void (vacuous)
@@ -41,8 +41,8 @@ import Language.Simple.Type.Constraint (Fuv (..), GeneratedConstraint (..), UniV
 import Language.Simple.Type.Env (HasLocalTypeEnv (..), HasProgramEnv (..), HasTypeEnv (..))
 import Language.Simple.Type.Error (TypeError (..))
 import Language.Simple.Type.Substitution (Instantiator, Subst (..))
-import qualified Language.Simple.Type.Substitution as Subst (empty, insert, lookup, member)
-import Language.Simple.Util (foldMapM, orThrow, orThrowM)
+import qualified Language.Simple.Type.Substitution as Subst (replace)
+import Language.Simple.Util (foldMapM, orThrowM)
 
 generateConstraint ::
   ( Extension x,
@@ -164,12 +164,13 @@ fromBinders ::
   (a -> Monotype x UniVar) ->
   t TypeVar ->
   m (Instantiator x, [a])
-fromBinders toMonotype = foldlM f (Subst.empty, [])
+fromBinders toMonotype = fmap g . foldlM f (mempty, [])
   where
     f (subst, vars) v = do
-      when (Subst.member v subst) $ throwError (ConflictingTypeVars v)
+      when (HashMap.member v subst) $ throwError (ConflictingTypeVars v)
       a <- fresh
-      pure (Subst.insert v (toMonotype a) subst, a : vars)
+      pure (HashMap.insert v (toMonotype a) subst, a : vars)
+    g (subst, vars) = (Subst subst, vars)
 
 composeInstantiator :: MonadError (TypeError x) m => Instantiator x -> Instantiator x -> m (Instantiator x)
 composeInstantiator (Subst m1) (Subst m2)
@@ -178,9 +179,6 @@ composeInstantiator (Subst m1) (Subst m2)
   where
     intersection = HashMap.intersection m1 m2
 
-replace :: MonadError (TypeError x) m => Instantiator x -> TypeVar -> m (Monotype x UniVar)
-replace m v = Subst.lookup v m `orThrow` UnboundTypeVar v
-
 instantiateMonotype ::
   ( Instantiable x (Monotype x),
     MonadError (TypeError x) m
@@ -188,7 +186,7 @@ instantiateMonotype ::
   Instantiator x ->
   SimpleMonotype x ->
   m (Monotype x UniVar)
-instantiateMonotype = instantiate . replace
+instantiateMonotype = instantiate . Subst.replace
 
 instantiateConstraint ::
   ( Instantiable x (Constraint x),
@@ -197,7 +195,7 @@ instantiateConstraint ::
   Instantiator x ->
   SimpleConstraint x ->
   m (Constraint x UniVar)
-instantiateConstraint = instantiate . replace
+instantiateConstraint = instantiate . Subst.replace
 
 findDataCtor :: (HasProgramEnv x m, MonadError (TypeError x) m) => DataCtor -> m (DataCtorType x)
 findDataCtor k = lookupDataCtor k `orThrowM` UnboundDataCtor k

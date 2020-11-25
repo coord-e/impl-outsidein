@@ -18,9 +18,7 @@ module Language.Simple.Extension.TypeClass
 where
 
 import Control.Applicative (empty, many)
-import Control.Monad (when)
 import Control.Monad.Except (MonadError (..))
-import Data.Foldable (foldlM)
 import Data.Hashable (Hashable)
 import Data.Maybe (isJust)
 import Data.Text (Text)
@@ -46,8 +44,8 @@ import Language.Simple.Type.Constraint (Fuv (..), UniVar)
 import Language.Simple.Type.Env (HasProgramEnv (..))
 import Language.Simple.Type.Error (TypeError (..))
 import Language.Simple.Type.Substitution (Subst (..), Substitutable (..), Unifier)
-import qualified Language.Simple.Type.Substitution as Subst (compose, empty, insert, lookup, member, null, singleton)
-import Language.Simple.Util (foldMapM, orThrow, uncons)
+import qualified Language.Simple.Type.Substitution as Subst (compose, empty, fromBinders, null, replace, singleton)
+import Language.Simple.Util (findDuplicate, foldMapM, uncons)
 import Prettyprinter (Pretty (..), hsep)
 import Prettyprinter.Internal (unsafeTextWithoutNewlines)
 import Text.Parser.Token (TokenParsing)
@@ -223,15 +221,10 @@ instantiateClassAxiomScheme ::
   Constraint X Void ->
   ExtensionConstraint X Void ->
   m (Constraint X UniVar, ExtensionConstraint X UniVar)
-instantiateClassAxiomScheme vars constraint head = do
-  instantiator <- fromBinders vars
-  c <- instantiate (replace instantiator) constraint
-  h <- instantiate (replace instantiator) head
-  pure (c, h)
-  where
-    fromBinders = foldlM go Subst.empty
-    go subst v = do
-      when (Subst.member v subst) $ throwError (ConflictingTypeVars v)
-      a <- fresh
-      pure $ Subst.insert v (UniType a) subst
-    replace m v = Subst.lookup v m `orThrow` UnboundTypeVar v
+instantiateClassAxiomScheme vars constraint head
+  | Just v <- findDuplicate vars = throwError $ ConflictingTypeVars v
+  | otherwise = do
+    instantiator <- Subst.fromBinders vars
+    c <- instantiate (Subst.replace instantiator) constraint
+    h <- instantiate (Subst.replace instantiator) head
+    pure (c, h)
