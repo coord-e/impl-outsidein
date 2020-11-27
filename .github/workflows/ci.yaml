@@ -13,7 +13,7 @@ jobs:
           ghc-version: '8.10.1'
           cabal-version: '3.2'
       - run: cabal new-update
-      - run: cabal new-test
+      - run: cabal new-test --test-show-details=streaming
   hlint:
     name: lint .hs
     runs-on: ubuntu-16.04
