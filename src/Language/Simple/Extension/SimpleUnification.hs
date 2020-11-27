@@ -5,11 +5,16 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Language.Simple.Extension.SimpleUnification
   ( SimpleUnification,
+    Tv (..),
+    ExtensionTypeError (..),
     simplifyUnificationConstraint,
     toXConstraint,
     toXType,
@@ -17,9 +22,11 @@ module Language.Simple.Extension.SimpleUnification
 where
 
 import Control.Applicative (empty)
+import Control.Monad.Except (MonadError (..))
+import Data.Foldable (foldrM)
 import qualified Data.HashMap.Strict as HashMap (foldrWithKey, lookup)
 import Data.HashSet (HashSet)
-import qualified Data.HashSet as HashSet (delete, member)
+import qualified Data.HashSet as HashSet (delete, member, singleton)
 import Data.Hashable (Hashable)
 import qualified Data.Vector as Vector (zip)
 import GHC.Generics (Generic)
@@ -34,10 +41,11 @@ import Language.Simple.Extension
   )
 import Language.Simple.Syntax (Constraint (..), Monotype (..), TypeVar)
 import Language.Simple.Type.Constraint (Fuv (..), GeneratedConstraint (..), UniVar)
+import Language.Simple.Type.Error (TypeError (..))
 import Language.Simple.Type.Substitution (Subst (..), Substitutable (..), Unifier)
 import qualified Language.Simple.Type.Substitution as Subst (compose, empty, singleton)
 import Language.Simple.Util (fromJustOr)
-import Prettyprinter (Pretty (..))
+import Prettyprinter (Pretty (..), squotes, (<+>))
 
 data SimpleUnification
 
@@ -102,86 +110,124 @@ instance SyntaxExtension X (ExtensionConstraint X) where
   extensionParser = empty
 
 data instance ExtensionTypeError X
+  = OccurCheckError Tv (Monotype X UniVar)
+  | MismatchedTypes (Monotype X UniVar) (Monotype X UniVar)
 
--- ditto
-{- ORMOLU_DISABLE -}
 instance Pretty (ExtensionTypeError X) where
-  pretty x = case x of {}
-{- ORMOLU_ENABLE -}
+  pretty (OccurCheckError v t) = "occur check failed:" <+> pretty v <+> "~" <+> pretty t
+  pretty (MismatchedTypes t1 t2) =
+    "could not match expected type"
+      <+> squotes (pretty t1)
+      <+> "with actual type"
+      <+> squotes (pretty t2)
 
 instance Extension X where
-  simplifyConstraint given tch wanted = pure $ simplifyUnificationConstraint given tch wanted
+  simplifyConstraint given tch wanted = reinterpretError $ simplifyUnificationConstraint given tch wanted
+    where
+      reinterpretError (Right x) = pure x
+      reinterpretError (Left e) = throwError (ExtensionTypeError e)
 
 simplifyUnificationConstraint ::
+  MonadError (ExtensionTypeError X) m =>
   Constraint X UniVar ->
   HashSet UniVar ->
   Constraint X UniVar ->
-  (Constraint X UniVar, Unifier X)
-simplifyUnificationConstraint given tch wanted = solve $ substitute givenSubst wanted
+  m (Constraint X UniVar, Unifier X)
+simplifyUnificationConstraint given tch wanted = do
+  givenSubst <- reduceGiven given
+  solve $ substitute givenSubst wanted
   where
-    givenSubst = reduceGiven given
-    reduceGiven EmptyConstraint = Subst.empty
+    reduceGiven EmptyConstraint = pure Subst.empty
     reduceGiven (EqualityConstraint t1 t2) = unifyGiven t1 t2
-    reduceGiven (ProductConstraint q1 q2) = Subst.compose s2 s1
-      where
-        s1 = reduceGiven q1
-        s2 = reduceGiven (substitute s1 q2)
+    reduceGiven (ProductConstraint q1 q2) = do
+      s1 <- reduceGiven q1
+      s2 <- reduceGiven (substitute s1 q2)
+      pure $ Subst.compose s2 s1
     reduceGiven (ExtensionConstraint x) = discardConstraintExt x
-    unifyGiven (UniType u) t = Subst.singleton (UniSomeVar u) t
-    unifyGiven t (UniType u) = Subst.singleton (UniSomeVar u) t
-    unifyGiven (VarType v) t = Subst.singleton (RigidSomeVar v) t
-    unifyGiven t (VarType v) = Subst.singleton (RigidSomeVar v) t
-    unifyGiven (ApplyType k1 ts1) (ApplyType k2 ts2) | k1 == k2 = unifyGivenAll ts1 ts2
-    unifyGiven _ _ = Subst.empty
-    unifyGivenAll xs ys = foldr go Subst.empty (Vector.zip xs ys)
+    unifyGiven (TvType v) t = unifyVarGiven v t
+    unifyGiven t (TvType v) = unifyVarGiven v t
+    unifyGiven t1@(ApplyType k1 ts1) t2@(ApplyType k2 ts2)
+      | k1 == k2 && length ts1 == length ts2 = unifyGivenAll ts1 ts2
+      | otherwise = throwError $ MismatchedTypes t1 t2
+    unifyGivenAll xs ys = foldrM go Subst.empty (Vector.zip xs ys)
       where
-        go (x, y) s1 =
-          let s2 = unifyGiven (substitute s1 x) (substitute s1 y)
-           in Subst.compose s2 s1
-    solve EmptyConstraint = (mempty, Subst.empty)
+        go (x, y) s1 = do
+          s2 <- unifyGiven (substitute s1 x) (substitute s1 y)
+          pure $ Subst.compose s2 s1
+    unifyVarGiven v t
+      | HashSet.member v (ftv t) = throwError $ OccurCheckError v t
+      | otherwise = pure $ Subst.singleton v t
+    solve EmptyConstraint = pure (mempty, Subst.empty)
     solve (EqualityConstraint t1 t2) = unify t1 t2
-    solve (ProductConstraint q1 q2) = (substitute s2 r1 <> r2, Subst.compose s2 s1)
+    solve (ProductConstraint q1 q2) = do
+      (r1, s1) <- solve q1
+      (r2, s2) <- solve (substitute s1 q2)
+      pure (substitute s2 r1 <> r2, Subst.compose s2 s1)
+    unify (TvType v1) (TvType v2) | v1 == v2 = pure (mempty, Subst.empty)
+    unify (UniType u) t = unifyVar u t
+    unify t (UniType u) = unifyVar u t
+    unify t1@(ApplyType k1 ts1) t2@(ApplyType k2 ts2)
+      | k1 == k2 && length ts1 == length ts2 = unifyAll ts1 ts2
+      | otherwise = throwError $ MismatchedTypes t1 t2
+    unify t1 t2 = pure (EqualityConstraint t1 t2, Subst.empty)
+    unifyVar u t
+      | HashSet.member u (fuv t) = throwError $ OccurCheckError (UniTv u) t
+      | HashSet.member u tch = pure (mempty, Subst.singleton u t)
+      | otherwise = pure (EqualityConstraint (UniType u) t, Subst.empty)
+    unifyAll xs ys = foldrM go (mempty, Subst.empty) (Vector.zip xs ys)
       where
-        (r1, s1) = solve q1
-        (r2, s2) = solve (substitute s1 q2)
-    unify (UniType u1) (UniType u2) | u1 == u2 = (mempty, Subst.empty)
-    unify (VarType v1) (VarType v2) | v1 == v2 = (mempty, Subst.empty)
-    unify (UniType u) t | check u t = (mempty, Subst.singleton u t)
-    unify t (UniType u) | check u t = (mempty, Subst.singleton u t)
-    unify (ApplyType k1 ts1) (ApplyType k2 ts2) | k1 == k2 = unifyAll ts1 ts2
-    unify t1 t2 = (EqualityConstraint t1 t2, Subst.empty)
-    check u t = HashSet.member u tch && not (HashSet.member u (fuv t))
-    unifyAll xs ys = foldr go (mempty, Subst.empty) (Vector.zip xs ys)
-      where
-        go (x, y) (c, s1) =
-          let (r, s2) = unify (substitute s1 x) (substitute s1 y)
-           in (c <> r, Subst.compose s2 s1)
+        go (x, y) (c, s1) = do
+          (r, s2) <- unify (substitute s1 x) (substitute s1 y)
+          pure (c <> r, Subst.compose s2 s1)
 
-data SomeVar
-  = UniSomeVar UniVar
-  | RigidSomeVar TypeVar
+data Tv
+  = UniTv UniVar
+  | RigidTv TypeVar
   deriving stock (Show, Ord, Eq, Generic)
   deriving anyclass (Hashable)
 
-instance Substitutable X SomeVar (GeneratedConstraint X) where
+instance Pretty Tv where
+  pretty (UniTv u) = pretty u
+  pretty (RigidTv v) = pretty v
+
+instance Substitutable X Tv (GeneratedConstraint X) where
   substitute s (Constraint q) = Constraint (substitute s q)
   substitute s (ProductGeneratedConstraint c1 c2) = ProductGeneratedConstraint (substitute s c1) (substitute s c2)
   substitute s@(Subst m) (ExistentialGeneratedConstraint vs p c) = ExistentialGeneratedConstraint vs' (substitute s p) (substitute s c)
     where
       vs' = HashMap.foldrWithKey go vs m
-      go (UniSomeVar u) _ = HashSet.delete u
+      go (UniTv u) _ = HashSet.delete u
       go _ _ = id
 
-instance Substitutable X SomeVar (ExtensionConstraint X UniVar) where
+instance Substitutable X Tv (ExtensionConstraint X UniVar) where
   substitute _ = discardConstraintExt
 
-instance Substitutable X SomeVar (ExtensionMonotype X UniVar) where
+instance Substitutable X Tv (ExtensionMonotype X UniVar) where
   substitute _ = discardMonotypeExt
 
-instance Substitutable X SomeVar (Monotype X UniVar) where
-  substitute (Subst s) (VarType v) = HashMap.lookup (RigidSomeVar v) s `fromJustOr` VarType v
-  substitute (Subst s) (UniType u) = HashMap.lookup (UniSomeVar u) s `fromJustOr` UniType u
+instance Substitutable X Tv (Monotype X UniVar) where
+  substitute (Subst s) (VarType v) = HashMap.lookup (RigidTv v) s `fromJustOr` VarType v
+  substitute (Subst s) (UniType u) = HashMap.lookup (UniTv u) s `fromJustOr` UniType u
   substitute s (ApplyType k ts) = ApplyType k $ fmap (substitute s) ts
+
+tvOrNothing :: Monotype X UniVar -> Maybe Tv
+tvOrNothing (UniType u) = Just (UniTv u)
+tvOrNothing (VarType v) = Just (RigidTv v)
+tvOrNothing _ = Nothing
+
+pattern TvType :: Tv -> Monotype X UniVar
+pattern TvType tv <-
+  (tvOrNothing -> Just tv)
+  where
+    TvType (UniTv u) = UniType u
+    TvType (RigidTv v) = VarType v
+
+{-# COMPLETE TvType, ApplyType #-}
+
+ftv :: Monotype X UniVar -> HashSet Tv
+ftv (VarType v) = HashSet.singleton (RigidTv v)
+ftv (UniType u) = HashSet.singleton (UniTv u)
+ftv (ApplyType _ ts) = foldMap ftv ts
 
 toXConstraint :: Constraint X a -> Constraint x a
 toXConstraint EmptyConstraint = EmptyConstraint

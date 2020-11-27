@@ -8,6 +8,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -35,8 +36,13 @@ import Language.Simple.Extension
     Instantiable (..),
     SyntaxExtension (..),
   )
-import Language.Simple.Extension.SimpleUnification (SimpleUnification, simplifyUnificationConstraint, toXConstraint)
-import qualified Language.Simple.Extension.SimpleUnification as U (toXType)
+import Language.Simple.Extension.SimpleUnification
+  ( SimpleUnification,
+    Tv,
+    simplifyUnificationConstraint,
+    toXConstraint,
+  )
+import qualified Language.Simple.Extension.SimpleUnification as U (ExtensionTypeError (..), toXType)
 import Language.Simple.Fresh (Fresh (..))
 import Language.Simple.Parser (atomMonotypeParser, upperName)
 import Language.Simple.Syntax (AxiomScheme (..), Constraint (..), Monotype (..), TypeVar, prettyAtomMonotype)
@@ -46,7 +52,7 @@ import Language.Simple.Type.Error (TypeError (..))
 import Language.Simple.Type.Substitution (Subst (..), Substitutable (..), Unifier)
 import qualified Language.Simple.Type.Substitution as Subst (compose, empty, fromBinders, null, replace, singleton)
 import Language.Simple.Util (findDuplicate, foldMapM, uncons)
-import Prettyprinter (Pretty (..), hsep)
+import Prettyprinter (Pretty (..), hsep, squotes, (<+>))
 import Prettyprinter.Internal (unsafeTextWithoutNewlines)
 import Text.Parser.Token (TokenParsing)
 import Prelude hiding (head)
@@ -122,12 +128,16 @@ instance SyntaxExtension X (ExtensionConstraint X) where
       manyV = fmap Vector.fromList . many
 
 data instance ExtensionTypeError X
+  = OccurCheckError Tv (Monotype X UniVar)
+  | MismatchedTypes (Monotype X UniVar) (Monotype X UniVar)
 
--- ditto
-{- ORMOLU_DISABLE -}
 instance Pretty (ExtensionTypeError X) where
-  pretty x = case x of {}
-{- ORMOLU_ENABLE -}
+  pretty (OccurCheckError v t) = "occur check failed:" <+> pretty v <+> "~" <+> pretty t
+  pretty (MismatchedTypes t1 t2) =
+    "could not match expected type"
+      <+> squotes (pretty t1)
+      <+> "with actual type"
+      <+> squotes (pretty t2)
 
 instance Extension X where
   simplifyConstraint given tch initWanted = solve initWantedU initWantedC Subst.empty
@@ -136,7 +146,7 @@ instance Extension X where
       (initWantedU, initWantedC) = splitConstraint initWanted
       solve wantedU wantedC acc = do
         (residualU1, residualC) <- foldMapM (reduceClassConstraint givenC) wantedC
-        let (residualU2, unifier) = simplifyUnificationConstraint givenU tch wantedU
+        (residualU2, unifier) <- reinterpretError $ simplifyUnificationConstraint givenU tch wantedU
         let residualU = substitute unifier residualU1 <> residualU2
         let unifier' = upgradeUnifier unifier
         if Subst.null unifier
@@ -144,6 +154,11 @@ instance Extension X where
           else solve residualU (map (substitute unifier') residualC) (Subst.compose unifier' acc)
       finalizeConstraint u c = toXConstraint u <> foldMap ExtensionConstraint c
       upgradeUnifier (Subst m) = Subst $ fmap U.toXType m
+      reinterpretError (Right x) = pure x
+      reinterpretError (Left (U.OccurCheckError v t)) =
+        throwError . ExtensionTypeError $ OccurCheckError v (U.toXType t)
+      reinterpretError (Left (U.MismatchedTypes t1 t2)) =
+        throwError . ExtensionTypeError $ MismatchedTypes (U.toXType t1) (U.toXType t2)
 
 type SplitConstraint = (Constraint SimpleUnification UniVar, [ExtensionConstraint X UniVar])
 
