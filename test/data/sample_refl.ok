@@ -1,5 +1,3 @@
-// simple, class, class_family
-
 data Refl :: forall a b. (a ~ b) => Eq a b
 
 let coerce :: forall a b. Eq a b -> a -> b

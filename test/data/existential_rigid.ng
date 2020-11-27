@@ -1,4 +1,2 @@
-// simple, class, class_family
-
 data Pack :: exists a. a -> Bottom
 let x = case (Pack 1) { Pack n => n }

@@ -1,4 +1,2 @@
-// simple, class, class_family
-
 type print :: Int -> Unit
 let x = print True

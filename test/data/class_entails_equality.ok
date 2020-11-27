@@ -1,4 +1,4 @@
-// class, class_family
+// test: class, class_family
 
 axiom forall a b. (a ~ b) => Eqc a b
 type coerce :: forall a b. (Eqc a b) => a -> b

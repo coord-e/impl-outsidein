@@ -1,4 +1,3 @@
-// simple, class, class_family
 // §5.1
 
 data T1 :: forall a. (Bool ~ a) => Int -> T a

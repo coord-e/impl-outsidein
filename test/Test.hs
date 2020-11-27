@@ -8,7 +8,7 @@ import Control.Monad.Except (runExceptT)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Logger (runNoLoggingT)
 import Data.Text (Text)
-import qualified Data.Text as Text (drop, splitOn, strip, takeWhile)
+import qualified Data.Text as Text (splitOn, strip, stripPrefix, takeWhile, unpack)
 import qualified Data.Text.IO as Text (readFile)
 import Language.Simple.Extension (Extension)
 import Language.Simple.Extension.SimpleUnification (SimpleUnification)
@@ -32,11 +32,21 @@ makeTestForFile path = do
   pure . testGroup path $ map (`toTest` content) (extractExtensions content)
   where
     isOk = isExtensionOf "ok" path
-    extractExtensions = map Text.strip . Text.splitOn "," . Text.drop 2 . Text.takeWhile (/= '\n')
-    toTest "simple" = testCase "simple" . test @SimpleUnification isOk
-    toTest "class" = testCase "class" . test @TypeClass isOk
-    toTest "class_family" = testCase "class_family" . test @TypeClassTypeFamily isOk
-    toTest ext = error $ "unknown extension" ++ show ext
+    extractXNames =
+      maybe
+        (map fst extensions)
+        (map Text.strip . Text.splitOn ",")
+        . Text.stripPrefix "// test:"
+        . Text.takeWhile (/= '\n')
+    toTest name =
+      case lookup name extensions of
+        Just p -> testCase (Text.unpack name) . p isOk
+        Nothing -> error $ "unknown extension " ++ show name
+    extensions =
+      [ ("simple", test @SimpleUnification),
+        ("class", test @TypeClass),
+        ("class_family", test @TypeClassTypeFamily)
+      ]
 
 test :: forall x. Extension x => Bool -> Text -> Assertion
 test isOk content = runNoLoggingT $ do

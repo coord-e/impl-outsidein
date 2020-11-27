@@ -1,4 +1,4 @@
-// class_family
+// test: class_family
 
 data Refl :: forall a b. (a ~ b) => Eq a b
 

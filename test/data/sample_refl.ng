@@ -1,4 +1,2 @@
-// simple, class, class_family
-
 data Refl :: forall a b. (a ~ b) => Eq a b
 let irrefl :: Eq Int Bool = Refl

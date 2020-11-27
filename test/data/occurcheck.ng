@@ -1,4 +1,3 @@
-// simple, class, class_family
 type eq :: forall a. a -> a -> Bool
 data Just :: forall a. a -> Maybe a
 let f = \x. eq (Just x) x

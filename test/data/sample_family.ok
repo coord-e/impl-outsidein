@@ -1,4 +1,4 @@
-// class_family
+// test: class_family
 // §7.2
 
 axiom <F (List Int)> ~ Int
