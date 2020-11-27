@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -9,11 +7,9 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Language.Simple.ConstraintDomain.SimpleUnification
   ( SimpleUnification,
-    Tv (..),
     ExtensionTypeError (..),
     simplifyUnificationConstraint,
     toXConstraint,
@@ -24,12 +20,9 @@ where
 import Control.Applicative (empty)
 import Control.Monad.Except (MonadError (..))
 import Data.Foldable (foldrM)
-import qualified Data.HashMap.Strict as HashMap (foldrWithKey, lookup)
 import Data.HashSet (HashSet)
-import qualified Data.HashSet as HashSet (delete, member, singleton)
-import Data.Hashable (Hashable)
+import qualified Data.HashSet as HashSet (member)
 import qualified Data.Vector as Vector (zip)
-import GHC.Generics (Generic)
 import Language.Simple.ConstraintDomain
   ( ConstraintDomain (..),
     ExtensionConstraint,
@@ -39,12 +32,12 @@ import Language.Simple.ConstraintDomain
     Instantiable (..),
     SyntaxExtension (..),
   )
-import Language.Simple.Syntax (Constraint (..), Monotype (..), TypeVar)
-import Language.Simple.Type.Constraint (Fuv (..), GeneratedConstraint (..), UniVar)
+import Language.Simple.ConstraintDomain.Util (Ftv (..), Tv (..), pattern TvType)
+import Language.Simple.Syntax (Constraint (..), Monotype (..))
+import Language.Simple.Type.Constraint (Fuv (..), UniVar)
 import Language.Simple.Type.Error (TypeError (..))
-import Language.Simple.Type.Substitution (Subst (..), Substitutable (..), Unifier)
+import Language.Simple.Type.Substitution (Substitutable (..), Unifier)
 import qualified Language.Simple.Type.Substitution as Subst (compose, empty, singleton)
-import Language.Simple.Util (fromJustOr)
 import Prettyprinter (Pretty (..), squotes, (<+>))
 
 data SimpleUnification
@@ -65,6 +58,9 @@ instance Functor (ExtensionMonotype X) where
 instance Fuv (ExtensionMonotype X a) where
   fuv = discardMonotypeExt
 
+instance Ftv (ExtensionMonotype X a) where
+  ftv = discardMonotypeExt
+
 instance Pretty (ExtensionMonotype X a) where
   pretty = discardMonotypeExt
 
@@ -75,6 +71,9 @@ instance Instantiable X (ExtensionMonotype X) where
   instantiate _ = discardMonotypeExt
 
 instance Substitutable X UniVar (ExtensionMonotype X a) where
+  substitute _ = discardMonotypeExt
+
+instance Substitutable X Tv (ExtensionMonotype X a) where
   substitute _ = discardMonotypeExt
 
 instance SyntaxExtension X (ExtensionMonotype X) where
@@ -94,6 +93,9 @@ instance Functor (ExtensionConstraint X) where
 instance Fuv (ExtensionConstraint X a) where
   fuv = discardConstraintExt
 
+instance Ftv (ExtensionConstraint X a) where
+  ftv = discardConstraintExt
+
 instance Pretty (ExtensionConstraint X a) where
   pretty = discardConstraintExt
 
@@ -104,6 +106,9 @@ instance Instantiable X (ExtensionConstraint X) where
   instantiate _ = discardConstraintExt
 
 instance Substitutable X UniVar (ExtensionConstraint X a) where
+  substitute _ = discardConstraintExt
+
+instance Substitutable X Tv (ExtensionConstraint X a) where
   substitute _ = discardConstraintExt
 
 instance SyntaxExtension X (ExtensionConstraint X) where
@@ -179,55 +184,6 @@ simplifyUnificationConstraint given tch wanted = do
         go (x, y) (c, s1) = do
           (r, s2) <- unify (substitute s1 x) (substitute s1 y)
           pure (c <> r, Subst.compose s2 s1)
-
-data Tv
-  = UniTv UniVar
-  | RigidTv TypeVar
-  deriving stock (Show, Ord, Eq, Generic)
-  deriving anyclass (Hashable)
-
-instance Pretty Tv where
-  pretty (UniTv u) = pretty u
-  pretty (RigidTv v) = pretty v
-
-instance Substitutable X Tv (GeneratedConstraint X) where
-  substitute s (Constraint q) = Constraint (substitute s q)
-  substitute s (ProductGeneratedConstraint c1 c2) = ProductGeneratedConstraint (substitute s c1) (substitute s c2)
-  substitute s@(Subst m) (ExistentialGeneratedConstraint vs p c) = ExistentialGeneratedConstraint vs' (substitute s p) (substitute s c)
-    where
-      vs' = HashMap.foldrWithKey go vs m
-      go (UniTv u) _ = HashSet.delete u
-      go _ _ = id
-
-instance Substitutable X Tv (ExtensionConstraint X UniVar) where
-  substitute _ = discardConstraintExt
-
-instance Substitutable X Tv (ExtensionMonotype X UniVar) where
-  substitute _ = discardMonotypeExt
-
-instance Substitutable X Tv (Monotype X UniVar) where
-  substitute (Subst s) (VarType v) = HashMap.lookup (RigidTv v) s `fromJustOr` VarType v
-  substitute (Subst s) (UniType u) = HashMap.lookup (UniTv u) s `fromJustOr` UniType u
-  substitute s (ApplyType k ts) = ApplyType k $ fmap (substitute s) ts
-
-tvOrNothing :: Monotype X UniVar -> Maybe Tv
-tvOrNothing (UniType u) = Just (UniTv u)
-tvOrNothing (VarType v) = Just (RigidTv v)
-tvOrNothing _ = Nothing
-
-pattern TvType :: Tv -> Monotype X UniVar
-pattern TvType tv <-
-  (tvOrNothing -> Just tv)
-  where
-    TvType (UniTv u) = UniType u
-    TvType (RigidTv v) = VarType v
-
-{-# COMPLETE TvType, ApplyType #-}
-
-ftv :: Monotype X UniVar -> HashSet Tv
-ftv (VarType v) = HashSet.singleton (RigidTv v)
-ftv (UniType u) = HashSet.singleton (UniTv u)
-ftv (ApplyType _ ts) = foldMap ftv ts
 
 toXConstraint :: Constraint X a -> Constraint x a
 toXConstraint EmptyConstraint = EmptyConstraint

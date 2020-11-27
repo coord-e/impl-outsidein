@@ -30,6 +30,7 @@ import Language.Simple.ConstraintDomain
     Instantiable (..),
     SyntaxExtension (..),
   )
+import Language.Simple.ConstraintDomain.Util (Ftv (..), Tv)
 import Language.Simple.Parser (atomMonotypeParser, upperName)
 import Language.Simple.Syntax (Constraint, Monotype (..), TypeVar, prettyAtomMonotype)
 import Language.Simple.Type.Constraint (Fuv (..), UniVar)
@@ -76,6 +77,9 @@ instance Functor (ExtensionMonotype X) where
 instance Fuv (ExtensionMonotype X UniVar) where
   fuv (FamilyApplyExtensionType _ ts) = foldMap fuv ts
 
+instance Ftv (ExtensionMonotype X UniVar) where
+  ftv (FamilyApplyExtensionType _ ts) = foldMap ftv ts
+
 instance Pretty a => Pretty (ExtensionMonotype X a) where
   pretty (FamilyApplyExtensionType k ts) = "<" <> inner <> ">"
     where
@@ -93,6 +97,9 @@ instance Substitutable X UniVar (ExtensionMonotype X UniVar) where
 instance Substitutable X TypeVar (ExtensionMonotype X UniVar) where
   substitute s (FamilyApplyExtensionType k ts) = FamilyApplyExtensionType k $ fmap (substitute s) ts
 
+instance Substitutable X Tv (ExtensionMonotype X UniVar) where
+  substitute s (FamilyApplyExtensionType k ts) = FamilyApplyExtensionType k $ fmap (substitute s) ts
+
 instance SyntaxExtension X (ExtensionMonotype X) where
   extensionParser = between (textSymbol "<") (textSymbol ">") inner
     where
@@ -107,6 +114,9 @@ instance Functor (ExtensionConstraint X) where
 instance Fuv (ExtensionConstraint X UniVar) where
   fuv (ClassExtensionConstraint _ ts) = foldMap fuv ts
 
+instance Ftv (ExtensionConstraint X UniVar) where
+  ftv (ClassExtensionConstraint _ ts) = foldMap ftv ts
+
 instance Pretty a => Pretty (ExtensionConstraint X a) where
   pretty (ClassExtensionConstraint k ts) = hsep (pretty k : map prettyAtomMonotype (Vector.toList ts))
 
@@ -120,6 +130,9 @@ instance Substitutable X UniVar (ExtensionConstraint X UniVar) where
   substitute s (ClassExtensionConstraint k ts) = ClassExtensionConstraint k $ fmap (substitute s) ts
 
 instance Substitutable X TypeVar (ExtensionConstraint X UniVar) where
+  substitute s (ClassExtensionConstraint k ts) = ClassExtensionConstraint k $ fmap (substitute s) ts
+
+instance Substitutable X Tv (ExtensionConstraint X UniVar) where
   substitute s (ClassExtensionConstraint k ts) = ClassExtensionConstraint k $ fmap (substitute s) ts
 
 instance SyntaxExtension X (ExtensionConstraint X) where

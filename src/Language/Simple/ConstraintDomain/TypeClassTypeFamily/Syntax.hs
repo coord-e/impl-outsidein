@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -11,18 +10,14 @@ module Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax
     pattern TypeClassConstraint,
     pattern FamilyFree,
     pattern FamilyFreeSeq,
-    pattern TvType,
     ConstraintLocation (..),
     Family (..),
     Class (..),
     FamilyType (..),
     ClassConstraint (..),
-    Tv (..),
     AtomicConstraint (..),
     isFamilyType,
-    isTvType,
     isFamilyFree,
-    ftv,
     atomicConstraints,
     fromAtomicConstraint,
     syntacticEqual,
@@ -31,9 +26,6 @@ module Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax
 where
 
 import Control.Monad (MonadPlus (..))
-import Data.HashSet (HashSet)
-import qualified Data.HashSet as HashSet (singleton)
-import Data.Hashable (Hashable)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (zip)
 import GHC.Generics (Generic)
@@ -44,11 +36,9 @@ import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension
     Family (..),
     TypeClassTypeFamily,
   )
-import Language.Simple.Syntax (Constraint (..), Monotype (..), TypeVar)
+import Language.Simple.Syntax (Constraint (..), Monotype (..))
 import Language.Simple.Type.Constraint (UniVar)
 import Language.Simple.Type.Substitution (Substitutable (..))
-import qualified Language.Simple.Type.Substitution as Subst (lookup)
-import Language.Simple.Util (fromJustOr)
 import Prettyprinter (Pretty (..))
 
 type X = TypeClassTypeFamily
@@ -61,16 +51,10 @@ isFamilyType :: Monotype X UniVar -> Bool
 isFamilyType (FamilyApplyType _ _) = True
 isFamilyType _ = False
 
-isTvType :: Monotype X UniVar -> Bool
-isTvType (TvType _) = True
-isTvType _ = False
-
 pattern FamilyApplyType :: Family -> Vector (Monotype X a) -> Monotype X a
 pattern FamilyApplyType k ts = ExtensionType (FamilyApplyExtensionType k ts)
 
 {-# COMPLETE VarType, UniType, ApplyType, FamilyApplyType #-}
-
-{-# COMPLETE TvType, ApplyType, FamilyApplyType #-}
 
 isFamilyFree :: Monotype X a -> Bool
 isFamilyFree (VarType _) = True
@@ -95,47 +79,6 @@ instance Pretty a => Pretty (FamilyType a) where
   pretty (FamilyType k ts) = pretty (FamilyApplyType k ts)
 
 data ClassConstraint a = ClassConstraint Class (Vector (Monotype X a))
-
-data Tv
-  = UniTv UniVar
-  | RigidTv TypeVar
-  deriving stock (Ord, Eq, Generic, Show)
-  deriving anyclass (Hashable)
-
-tvOrNothing :: Monotype X UniVar -> Maybe Tv
-tvOrNothing (UniType u) = Just (UniTv u)
-tvOrNothing (VarType v) = Just (RigidTv v)
-tvOrNothing _ = Nothing
-
-pattern TvType :: Tv -> Monotype X UniVar
-pattern TvType tv <-
-  (tvOrNothing -> Just tv)
-  where
-    TvType (UniTv u) = UniType u
-    TvType (RigidTv v) = VarType v
-
-{-# COMPLETE TvType, ApplyType, ExtensionType #-}
-
-ftv :: Monotype X UniVar -> HashSet Tv
-ftv (TvType v) = HashSet.singleton v
-ftv (ApplyType _ ts) = foldMap ftv ts
-ftv (FamilyApplyType _ ts) = foldMap ftv ts
-
-instance Pretty Tv where
-  pretty (UniTv u) = pretty u
-  pretty (RigidTv v) = pretty v
-
-instance Substitutable X Tv (Monotype X UniVar) where
-  substitute s (VarType v) = Subst.lookup (RigidTv v) s `fromJustOr` VarType v
-  substitute s (UniType u) = Subst.lookup (UniTv u) s `fromJustOr` UniType u
-  substitute s (ApplyType k ts) = ApplyType k $ fmap (substitute s) ts
-  substitute s (FamilyApplyType k ts) = FamilyApplyType k $ fmap (substitute s) ts
-
-instance Substitutable X Tv (ExtensionMonotype X UniVar) where
-  substitute s (FamilyApplyExtensionType k ts) = FamilyApplyExtensionType k $ fmap (substitute s) ts
-
-instance Substitutable X Tv (ExtensionConstraint X UniVar) where
-  substitute s (ClassExtensionConstraint k ts) = ClassExtensionConstraint k $ fmap (substitute s) ts
 
 pattern TypeClassConstraint :: Class -> Vector (Monotype X a) -> Constraint X a
 pattern TypeClassConstraint k ts = ExtensionConstraint (ClassExtensionConstraint k ts)

@@ -38,11 +38,11 @@ import Language.Simple.ConstraintDomain
   )
 import Language.Simple.ConstraintDomain.SimpleUnification
   ( SimpleUnification,
-    Tv,
     simplifyUnificationConstraint,
     toXConstraint,
   )
 import qualified Language.Simple.ConstraintDomain.SimpleUnification as U (ExtensionTypeError (..), toXType)
+import Language.Simple.ConstraintDomain.Util (Ftv (..), Tv)
 import Language.Simple.Fresh (Fresh (..))
 import Language.Simple.Parser (atomMonotypeParser, upperName)
 import Language.Simple.Syntax (AxiomScheme (..), Constraint (..), Monotype (..), TypeVar, prettyAtomMonotype)
@@ -86,6 +86,9 @@ instance Functor (ExtensionMonotype X) where
 instance Fuv (ExtensionMonotype X a) where
   fuv = discardMonotypeExt
 
+instance Ftv (ExtensionMonotype X a) where
+  ftv = discardMonotypeExt
+
 instance Pretty (ExtensionMonotype X a) where
   pretty = discardMonotypeExt
 
@@ -109,6 +112,9 @@ instance Functor (ExtensionConstraint X) where
 
 instance Fuv (ExtensionConstraint X UniVar) where
   fuv (TypeClassConstraint _ ts) = foldMap fuv ts
+
+instance Ftv (ExtensionConstraint X UniVar) where
+  ftv (TypeClassConstraint _ ts) = foldMap ftv ts
 
 instance Pretty a => Pretty (ExtensionConstraint X a) where
   pretty (TypeClassConstraint k ts) = hsep (pretty k : map prettyAtomMonotype (Vector.toList ts))

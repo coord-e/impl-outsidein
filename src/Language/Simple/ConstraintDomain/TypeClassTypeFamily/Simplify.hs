@@ -10,13 +10,12 @@ import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension (TypeClass
 import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax
   ( AtomicConstraint (..),
     fromAtomicConstraint,
-    ftv,
     syntacticEquals,
     pattern FamilyApplyType,
     pattern FamilyFree,
     pattern FamilyFreeSeq,
-    pattern TvType,
   )
+import Language.Simple.ConstraintDomain.Util (ftv, pattern TvType)
 import Language.Simple.Syntax (Constraint (..))
 import Language.Simple.Type.Constraint (UniVar)
 import Language.Simple.Type.Substitution (substitute)

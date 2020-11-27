@@ -38,6 +38,7 @@ library
         Language.Simple.Type.Generator
         Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension
         Language.Simple.ConstraintDomain.TypeClassTypeFamily.Canonicalize
+        Language.Simple.ConstraintDomain.Util
         Language.Simple.ConstraintDomain.TypeClassTypeFamily.Solver
         Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax
         Language.Simple.ConstraintDomain.TypeClassTypeFamily.Interact

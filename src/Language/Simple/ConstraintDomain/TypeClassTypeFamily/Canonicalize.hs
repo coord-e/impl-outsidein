@@ -23,17 +23,15 @@ import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax
   ( AtomicConstraint (..),
     ConstraintLocation (..),
     FamilyType (..),
-    ftv,
     isFamilyFree,
     isFamilyType,
-    isTvType,
     syntacticEqual,
     pattern FamilyApplyType,
     pattern FamilyFree,
     pattern FamilyFreeSeq,
-    pattern TvType,
     pattern TypeClassConstraint,
   )
+import Language.Simple.ConstraintDomain.Util (ftv, isTvType, pattern TvType)
 import Language.Simple.Fresh (Fresh (..))
 import Language.Simple.Syntax (Constraint (..), Monotype (..))
 import Language.Simple.Type.Constraint (UniVar)
