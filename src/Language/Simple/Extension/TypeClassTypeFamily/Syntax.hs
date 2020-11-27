@@ -121,6 +121,10 @@ ftv (TvType v) = HashSet.singleton v
 ftv (ApplyType _ ts) = foldMap ftv ts
 ftv (FamilyApplyType _ ts) = foldMap ftv ts
 
+instance Pretty Tv where
+  pretty (UniTv u) = pretty u
+  pretty (RigidTv v) = pretty v
+
 instance Substitutable X Tv (Monotype X UniVar) where
   substitute s (VarType v) = Subst.lookup (RigidTv v) s `fromJustOr` VarType v
   substitute s (UniType u) = Subst.lookup (UniTv u) s `fromJustOr` UniType u

@@ -18,12 +18,11 @@ import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet (member, singleton)
 import Data.Vector (Vector, ifoldr, (//))
 import qualified Data.Vector as Vector (zipWith)
-import Language.Simple.Extension.TypeClassTypeFamily.Extension (TypeClassTypeFamily)
+import Language.Simple.Extension.TypeClassTypeFamily.Extension (ExtensionTypeError (..), TypeClassTypeFamily)
 import Language.Simple.Extension.TypeClassTypeFamily.Syntax
   ( AtomicConstraint (..),
     ConstraintLocation (..),
     FamilyType (..),
-    fromAtomicConstraint,
     ftv,
     isFamilyFree,
     isFamilyType,
@@ -102,11 +101,11 @@ canonicalizeFlatten _ _ = mzero
 canonicalizeCommon :: MonadError (TypeError X) m => AtomicConstraint -> MaybeT m CanonicalizeOutput
 canonicalizeCommon (EqualityAtomicConstraint t1 t2)
   | syntacticEqual t1 t2 = pure $ CanonicalizeOutput mempty Subst.empty mempty
-canonicalizeCommon q@(EqualityAtomicConstraint (ApplyType k1 ts1) (ApplyType k2 ts2))
+canonicalizeCommon (EqualityAtomicConstraint t1@(ApplyType k1 ts1) t2@(ApplyType k2 ts2))
   | k1 == k2 && length ts1 == length ts2 = pure $ CanonicalizeOutput mempty Subst.empty (fold (Vector.zipWith EqualityConstraint ts1 ts2))
-  | otherwise = throwError (UnresolvedConstraint (fromAtomicConstraint q))
-canonicalizeCommon q@(EqualityAtomicConstraint (TvType v) (FamilyFree t))
-  | HashSet.member v (ftv t) = throwError (UnresolvedConstraint (fromAtomicConstraint q))
+  | otherwise = throwError . ExtensionTypeError $ MismatchedTypes t1 t2
+canonicalizeCommon (EqualityAtomicConstraint t1@(TvType v) t2@(FamilyFree t))
+  | HashSet.member v (ftv t) = throwError . ExtensionTypeError $ OccurCheckError t1 t2
 canonicalizeCommon (EqualityAtomicConstraint t1 t2)
   | t2 `isSmaller` t1 = pure $ CanonicalizeOutput mempty Subst.empty (EqualityConstraint t2 t1)
 canonicalizeCommon _ = mzero

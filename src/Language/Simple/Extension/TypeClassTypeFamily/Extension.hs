@@ -35,7 +35,7 @@ import Language.Simple.Syntax (Constraint, Monotype (..), TypeVar, prettyAtomMon
 import Language.Simple.Type.Constraint (Fuv (..), UniVar)
 import Language.Simple.Type.Error (ExtensionTypeError)
 import Language.Simple.Type.Substitution (Substitutable (..))
-import Prettyprinter (Pretty (..), hsep, (<+>))
+import Prettyprinter (Pretty (..), hsep, squotes, (<+>))
 import Prettyprinter.Internal (unsafeTextWithoutNewlines)
 import Text.Parser.Combinators (between)
 import Text.Parser.Token (TokenParsing, textSymbol)
@@ -125,10 +125,19 @@ instance Substitutable X TypeVar (ExtensionConstraint X UniVar) where
 instance SyntaxExtension X (ExtensionConstraint X) where
   extensionParser = ClassExtensionConstraint <$> classParser <*> manyV atomMonotypeParser
 
-data instance ExtensionTypeError X = MatchingGivenConstraint (Constraint X UniVar)
+data instance ExtensionTypeError X
+  = MatchingGivenConstraint (Constraint X UniVar)
+  | OccurCheckError (Monotype X UniVar) (Monotype X UniVar)
+  | MismatchedTypes (Monotype X UniVar) (Monotype X UniVar)
 
 instance Pretty (ExtensionTypeError X) where
   pretty (MatchingGivenConstraint q) = "the constraint" <+> pretty q <+> "matches an instance declaration"
+  pretty (OccurCheckError t1 t2) = "occur check failed:" <+> pretty t1 <+> "~" <+> pretty t2
+  pretty (MismatchedTypes t1 t2) =
+    "could not match expected type"
+      <+> squotes (pretty t1)
+      <+> "with actual type"
+      <+> squotes (pretty t2)
 
 manyV :: Alternative m => m a -> m (Vector a)
 manyV = fmap Vector.fromList . many

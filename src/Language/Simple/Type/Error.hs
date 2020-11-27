@@ -18,12 +18,11 @@ import Language.Simple.Syntax
     DataCtor,
     ExtensionConstraint,
     ExtensionMonotype,
-    Monotype (..),
     TermVar,
     TypeVar,
   )
 import Language.Simple.Type.Constraint (UniVar)
-import Prettyprinter (Doc, Pretty (..), dquotes, nest, sep, squotes, vsep, (<+>))
+import Prettyprinter (Pretty (..), dquotes, nest, sep, (<+>))
 
 data family ExtensionTypeError x
 
@@ -62,31 +61,5 @@ instance
           "but got"
             <+> pretty got
         ]
-  pretty (UnresolvedConstraint q) = nest 2 . vsep $ prettyUnresolvedConstraint q
+  pretty (UnresolvedConstraint q) = "unresolved constraint:" <+> pretty q
   pretty (ExtensionTypeError x) = pretty x
-
-prettyUnresolvedConstraint ::
-  ( Pretty (ExtensionMonotype x UniVar),
-    Pretty (ExtensionConstraint x UniVar)
-  ) =>
-  Constraint x UniVar ->
-  [Doc ann]
-prettyUnresolvedConstraint EmptyConstraint = []
-prettyUnresolvedConstraint (ProductConstraint q1 q2) = prettyUnresolvedConstraint q1 <> prettyUnresolvedConstraint q2
-prettyUnresolvedConstraint (EqualityConstraint t1 t2) =
-  [ nest 2 $
-      vsep
-        ( "could not match expected type"
-            <+> squotes (pretty t1)
-            <+> "with actual type"
-            <+> squotes (pretty t2) :
-          additionalInfo t1 t2
-        )
-  ]
-  where
-    additionalInfo (UniType u) _ = [pretty u <+> "is untouchable"]
-    additionalInfo _ (UniType u) = [pretty u <+> "is untouchable"]
-    additionalInfo (VarType a) _ = [dquotes (pretty a) <+> "is a rigid type variable"]
-    additionalInfo _ (VarType a) = [dquotes (pretty a) <+> "is a rigid type variable"]
-    additionalInfo _ _ = []
-prettyUnresolvedConstraint (ExtensionConstraint x) = ["unresolved constraint:" <+> pretty x]
