@@ -1,0 +1,7 @@
+// test: class_family
+// §7.4
+
+axiom forall a. (C a) => D (List a)
+type d :: forall a. (D a) => a -> Bool
+
+let f :: forall a. (D (List a)) => List a -> Bool = \x. d x

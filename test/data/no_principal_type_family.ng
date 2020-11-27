@@ -1,0 +1,14 @@
+// test: class_family
+// §2.3
+
+axiom forall b. <FB Int b> ~ Bool
+axiom forall a b. <FB (List a) b> ~ <FB a b>
+
+type not :: Bool -> Bool
+type fb :: forall a b. a -> b -> FB a b
+
+data K :: forall a. exists b. a -> b -> Bar a
+
+let h = \k. case k {
+    K x y => not (fb x y)
+  }

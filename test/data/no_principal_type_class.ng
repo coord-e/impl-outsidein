@@ -1,0 +1,11 @@
+// test: class, class_family
+// §2.3
+
+axiom forall b. Foo Int b
+axiom forall a b. (Foo a b) => Foo (List a) b
+
+type foo :: forall a b. (Foo a b) => a -> b -> Int
+
+let g = \y.
+  let h :: forall c. c -> Int = \x. foo y x
+  in h True

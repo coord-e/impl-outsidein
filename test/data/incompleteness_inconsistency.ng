@@ -1,0 +1,12 @@
+// §6.2
+// accepted in typing rules, but rejected in OutsideIn(X).
+
+data R1 :: forall a. (a ~ Int) => a -> R a
+data R2 :: forall a. (a ~ Bool) => a -> R a
+data False :: Bool
+
+let foo :: R Int -> Int
+  = \x. case x {
+    R1 y => y,
+    R2 y => False,
+  }

@@ -1,0 +1,8 @@
+// §6.3
+// accepted in typing rules, but rejected in OutsideIn(X).
+
+data RBool :: forall a. (a ~ Bool) => R a
+
+let foo = \rx. case rx {
+    RBool => 42
+  }

@@ -1,0 +1,12 @@
+// test: class, class_family
+// §2.3
+
+axiom forall a. (C a) => B a (List a)
+
+type op :: forall a b. (B a b) => a -> b
+
+data MkR :: forall a. (C a) => a -> R a
+
+let k = \r. case r {
+    MkR x => op x
+  }

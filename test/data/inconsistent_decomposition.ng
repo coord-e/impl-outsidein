@@ -1,0 +1,5 @@
+// §7.4
+
+data C :: Char
+type and :: Bool -> Bool -> Bool
+let f :: (Bool ~ Char) => Bool -> Char = \x. and x C
