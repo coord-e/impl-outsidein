@@ -131,7 +131,7 @@ generateConstraint (AnnotatedLetExpr x s e1 e2)
       envFuv <- localEnvFuv
       let delta = (fuv t1 `HashSet.union` fuv c1) `HashSet.difference` envFuv
       let c = c1 <> Constraint (EqualityConstraint t1 (vacuous monotype))
-      pure (t2, c1 <> c2 <> ExistentialGeneratedConstraint delta (vacuous constraint) c)
+      pure (t2, c2 <> ExistentialGeneratedConstraint delta (vacuous constraint) c)
 
 dataCtorTypeToTypeScheme :: DataCtorType x -> TypeScheme x
 dataCtorTypeToTypeScheme DataCtorType {universalVars, existentialVars, constraint, fields, ctor, ctorArgs} =
