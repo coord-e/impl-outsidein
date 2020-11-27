@@ -20,34 +20,34 @@ source-repository head
 
 library
     exposed-modules:
-        Language.Simple.Syntax
-        Language.Simple.Type
-        Language.Simple.Parser
+        Language.Simple
         Language.Simple.ConstraintDomain
         Language.Simple.ConstraintDomain.SimpleUnification
         Language.Simple.ConstraintDomain.TypeClass
         Language.Simple.ConstraintDomain.TypeClassTypeFamily
-        Language.Simple
+        Language.Simple.Parser
+        Language.Simple.Syntax
+        Language.Simple.Type
 
     hs-source-dirs:   src
     other-modules:
-        Language.Simple.Util
-        Language.Simple.Fresh
-        Language.Simple.Type.Env
-        Language.Simple.Type.Program
-        Language.Simple.Type.Generator
-        Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension
         Language.Simple.ConstraintDomain.TypeClassTypeFamily.Canonicalize
-        Language.Simple.ConstraintDomain.Util
-        Language.Simple.ConstraintDomain.TypeClassTypeFamily.Solver
-        Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax
+        Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension
         Language.Simple.ConstraintDomain.TypeClassTypeFamily.Interact
         Language.Simple.ConstraintDomain.TypeClassTypeFamily.Simplify
+        Language.Simple.ConstraintDomain.TypeClassTypeFamily.Solver
+        Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax
         Language.Simple.ConstraintDomain.TypeClassTypeFamily.TopReact
+        Language.Simple.ConstraintDomain.Util
+        Language.Simple.Fresh
         Language.Simple.Type.Constraint
-        Language.Simple.Type.Solver
+        Language.Simple.Type.Env
         Language.Simple.Type.Error
+        Language.Simple.Type.Generator
+        Language.Simple.Type.Program
+        Language.Simple.Type.Solver
         Language.Simple.Type.Substitution
+        Language.Simple.Util
 
     default-language: Haskell2010
     ghc-options:
