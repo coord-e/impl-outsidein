@@ -6,7 +6,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Language.Simple.Extension.TypeClassTypeFamily.Syntax
+module Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax
   ( pattern FamilyApplyType,
     pattern TypeClassConstraint,
     pattern FamilyFree,
@@ -37,7 +37,7 @@ import Data.Hashable (Hashable)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (zip)
 import GHC.Generics (Generic)
-import Language.Simple.Extension.TypeClassTypeFamily.Extension
+import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension
   ( Class (..),
     ExtensionConstraint (..),
     ExtensionMonotype (..),

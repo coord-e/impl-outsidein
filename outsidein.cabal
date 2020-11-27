@@ -23,10 +23,10 @@ library
         Language.Simple.Syntax
         Language.Simple.Type
         Language.Simple.Parser
-        Language.Simple.Extension
-        Language.Simple.Extension.SimpleUnification
-        Language.Simple.Extension.TypeClass
-        Language.Simple.Extension.TypeClassTypeFamily
+        Language.Simple.ConstraintDomain
+        Language.Simple.ConstraintDomain.SimpleUnification
+        Language.Simple.ConstraintDomain.TypeClass
+        Language.Simple.ConstraintDomain.TypeClassTypeFamily
         Language.Simple
 
     hs-source-dirs:   src
@@ -36,13 +36,13 @@ library
         Language.Simple.Type.Env
         Language.Simple.Type.Program
         Language.Simple.Type.Generator
-        Language.Simple.Extension.TypeClassTypeFamily.Extension
-        Language.Simple.Extension.TypeClassTypeFamily.Canonicalize
-        Language.Simple.Extension.TypeClassTypeFamily.Solver
-        Language.Simple.Extension.TypeClassTypeFamily.Syntax
-        Language.Simple.Extension.TypeClassTypeFamily.Interact
-        Language.Simple.Extension.TypeClassTypeFamily.Simplify
-        Language.Simple.Extension.TypeClassTypeFamily.TopReact
+        Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension
+        Language.Simple.ConstraintDomain.TypeClassTypeFamily.Canonicalize
+        Language.Simple.ConstraintDomain.TypeClassTypeFamily.Solver
+        Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax
+        Language.Simple.ConstraintDomain.TypeClassTypeFamily.Interact
+        Language.Simple.ConstraintDomain.TypeClassTypeFamily.Simplify
+        Language.Simple.ConstraintDomain.TypeClassTypeFamily.TopReact
         Language.Simple.Type.Constraint
         Language.Simple.Type.Solver
         Language.Simple.Type.Error

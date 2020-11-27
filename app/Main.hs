@@ -3,10 +3,10 @@ module Main where
 import App
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Text.IO as Text (readFile)
-import Language.Simple.Extension (Extension)
+import Language.Simple.ConstraintDomain (ConstraintDomain)
 import System.Environment (getArgs)
 
-typeFile :: Extension x => FilePath -> App x ()
+typeFile :: ConstraintDomain x => FilePath -> App x ()
 typeFile file = do
   content <- liftIO $ Text.readFile file
   program <- parseProgram content
@@ -14,5 +14,5 @@ typeFile file = do
 
 main :: IO ()
 main = do
-  [ext, path] <- getArgs
-  runApp ext $ typeFile path
+  [x, path] <- getArgs
+  runApp x $ typeFile path

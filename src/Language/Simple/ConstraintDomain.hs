@@ -3,8 +3,8 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Language.Simple.Extension
-  ( Extension (..),
+module Language.Simple.ConstraintDomain
+  ( ConstraintDomain (..),
     SyntaxExtension (..),
     ExtensionConstraint,
     ExtensionMonotype,
@@ -32,7 +32,7 @@ class
     SyntaxExtension x (ExtensionConstraint x),
     Pretty (ExtensionTypeError x)
   ) =>
-  Extension x
+  ConstraintDomain x
   where
   simplifyConstraint ::
     ( Fresh m,

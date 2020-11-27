@@ -2,7 +2,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE PatternSynonyms #-}
 
-module Language.Simple.Extension.TypeClassTypeFamily.Canonicalize
+module Language.Simple.ConstraintDomain.TypeClassTypeFamily.Canonicalize
   ( canonicalizeGiven,
     canonicalizeWanted,
     isCanonical,
@@ -18,8 +18,8 @@ import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet (member, singleton)
 import Data.Vector (Vector, ifoldr, (//))
 import qualified Data.Vector as Vector (zipWith)
-import Language.Simple.Extension.TypeClassTypeFamily.Extension (ExtensionTypeError (..), TypeClassTypeFamily)
-import Language.Simple.Extension.TypeClassTypeFamily.Syntax
+import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension (ExtensionTypeError (..), TypeClassTypeFamily)
+import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax
   ( AtomicConstraint (..),
     ConstraintLocation (..),
     FamilyType (..),

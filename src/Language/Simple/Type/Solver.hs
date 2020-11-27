@@ -12,7 +12,7 @@ import Control.Monad.Except (MonadError (..))
 import Control.Monad.Logger (MonadLogger)
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet (toList)
-import Language.Simple.Extension (Extension (..))
+import Language.Simple.ConstraintDomain (ConstraintDomain (..))
 import Language.Simple.Fresh (Fresh)
 import Language.Simple.Syntax (Constraint (..))
 import Language.Simple.Type.Constraint (GeneratedConstraint (..), UniVar, implic, isEmpty, reduce, simple)
@@ -23,7 +23,7 @@ import Language.Simple.Util (logParamsDebug)
 import Prettyprinter (Pretty (..))
 
 solveConstraint ::
-  ( Extension x,
+  ( ConstraintDomain x,
     HasProgramEnv x m,
     Fresh m,
     MonadLogger m,

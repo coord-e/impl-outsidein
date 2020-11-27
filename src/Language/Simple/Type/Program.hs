@@ -19,7 +19,7 @@ import qualified Data.HashMap.Strict as HashMap (elems, empty, insert, lookup, s
 import Data.Text (Text, pack)
 import qualified Data.Vector as Vector (fromList)
 import Data.Void (vacuous)
-import Language.Simple.Extension (Extension, Generalizable (..))
+import Language.Simple.ConstraintDomain (ConstraintDomain, Generalizable (..))
 import Language.Simple.Fresh (Fresh (..))
 import Language.Simple.Syntax
   ( Binding (..),
@@ -44,7 +44,7 @@ import Prettyprinter (Pretty (..), nest, (<+>))
 
 typeProgram ::
   forall x m.
-  ( Extension x,
+  ( ConstraintDomain x,
     MonadLogger m,
     MonadError (TypeError x) m
   ) =>
@@ -58,7 +58,7 @@ typeProgram Program {bindings, axioms, vars, dataCtors} =
       withTermVar x s acc
 
 typeBinding ::
-  ( Extension x,
+  ( ConstraintDomain x,
     HasLocalTypeEnv x m,
     HasTypeEnv x m,
     HasProgramEnv x m,

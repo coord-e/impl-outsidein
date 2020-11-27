@@ -19,7 +19,7 @@ import qualified Data.HashMap.Strict as HashMap (insert, intersection, keys, mem
 import qualified Data.HashSet as HashSet (delete, difference, union)
 import qualified Data.Vector as Vector (length, zip)
 import Data.Void (vacuous)
-import Language.Simple.Extension (Extension, Instantiable (..))
+import Language.Simple.ConstraintDomain (ConstraintDomain, Instantiable (..))
 import Language.Simple.Fresh (Fresh (..), GenFresh)
 import Language.Simple.Syntax
   ( CaseArm (..),
@@ -45,7 +45,7 @@ import qualified Language.Simple.Type.Substitution as Subst (replace)
 import Language.Simple.Util (foldMapM, orThrowM)
 
 generateConstraint ::
-  ( Extension x,
+  ( ConstraintDomain x,
     HasLocalTypeEnv x m,
     HasTypeEnv x m,
     HasProgramEnv x m,

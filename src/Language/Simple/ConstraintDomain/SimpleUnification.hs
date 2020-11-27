@@ -11,7 +11,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Language.Simple.Extension.SimpleUnification
+module Language.Simple.ConstraintDomain.SimpleUnification
   ( SimpleUnification,
     Tv (..),
     ExtensionTypeError (..),
@@ -30,8 +30,8 @@ import qualified Data.HashSet as HashSet (delete, member, singleton)
 import Data.Hashable (Hashable)
 import qualified Data.Vector as Vector (zip)
 import GHC.Generics (Generic)
-import Language.Simple.Extension
-  ( Extension (..),
+import Language.Simple.ConstraintDomain
+  ( ConstraintDomain (..),
     ExtensionConstraint,
     ExtensionMonotype,
     ExtensionTypeError,
@@ -121,7 +121,7 @@ instance Pretty (ExtensionTypeError X) where
       <+> "with actual type"
       <+> squotes (pretty t2)
 
-instance Extension X where
+instance ConstraintDomain X where
   simplifyConstraint given tch wanted = reinterpretError $ simplifyUnificationConstraint given tch wanted
     where
       reinterpretError (Right x) = pure x

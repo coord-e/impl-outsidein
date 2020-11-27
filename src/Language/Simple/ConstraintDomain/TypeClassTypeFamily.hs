@@ -1,5 +1,5 @@
 -- Implementation of X for type classes and type families, as described in §7.
-module Language.Simple.Extension.TypeClassTypeFamily
+module Language.Simple.ConstraintDomain.TypeClassTypeFamily
   ( TypeClassTypeFamily,
     ExtensionMonotype (..),
     ExtensionConstraint (..),
@@ -9,7 +9,7 @@ module Language.Simple.Extension.TypeClassTypeFamily
   )
 where
 
-import Language.Simple.Extension.TypeClassTypeFamily.Extension
+import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension
   ( Class (..),
     ExtensionConstraint (..),
     ExtensionMonotype (..),
@@ -17,4 +17,4 @@ import Language.Simple.Extension.TypeClassTypeFamily.Extension
     Family (..),
     TypeClassTypeFamily,
   )
-import Language.Simple.Extension.TypeClassTypeFamily.Solver ()
+import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Solver ()

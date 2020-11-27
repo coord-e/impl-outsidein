@@ -7,7 +7,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Language.Simple.Extension.TypeClassTypeFamily.Extension
+module Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension
   ( TypeClassTypeFamily,
     ExtensionMonotype (..),
     ExtensionConstraint (..),
@@ -23,7 +23,7 @@ import Data.Text (Text)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (fromList, toList)
 import GHC.Generics (Generic)
-import Language.Simple.Extension
+import Language.Simple.ConstraintDomain
   ( ExtensionConstraint,
     ExtensionMonotype,
     Generalizable (..),

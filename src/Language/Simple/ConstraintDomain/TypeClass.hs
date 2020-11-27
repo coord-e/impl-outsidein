@@ -12,7 +12,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Language.Simple.Extension.TypeClass
+module Language.Simple.ConstraintDomain.TypeClass
   ( TypeClass,
     Class (..),
   )
@@ -27,8 +27,8 @@ import Data.Vector (Vector)
 import qualified Data.Vector as Vector (fromList, null, toList)
 import Data.Void (Void)
 import GHC.Generics (Generic)
-import Language.Simple.Extension
-  ( Extension (..),
+import Language.Simple.ConstraintDomain
+  ( ConstraintDomain (..),
     ExtensionConstraint,
     ExtensionMonotype,
     ExtensionTypeError,
@@ -36,13 +36,13 @@ import Language.Simple.Extension
     Instantiable (..),
     SyntaxExtension (..),
   )
-import Language.Simple.Extension.SimpleUnification
+import Language.Simple.ConstraintDomain.SimpleUnification
   ( SimpleUnification,
     Tv,
     simplifyUnificationConstraint,
     toXConstraint,
   )
-import qualified Language.Simple.Extension.SimpleUnification as U (ExtensionTypeError (..), toXType)
+import qualified Language.Simple.ConstraintDomain.SimpleUnification as U (ExtensionTypeError (..), toXType)
 import Language.Simple.Fresh (Fresh (..))
 import Language.Simple.Parser (atomMonotypeParser, upperName)
 import Language.Simple.Syntax (AxiomScheme (..), Constraint (..), Monotype (..), TypeVar, prettyAtomMonotype)
@@ -139,7 +139,7 @@ instance Pretty (ExtensionTypeError X) where
       <+> "with actual type"
       <+> squotes (pretty t2)
 
-instance Extension X where
+instance ConstraintDomain X where
   simplifyConstraint given tch initWanted = solve initWantedU initWantedC Subst.empty
     where
       (givenU, givenC) = splitConstraint given

@@ -14,10 +14,10 @@ import Control.Monad.Logger (LoggingT, MonadLogger, logErrorN, runStdoutLoggingT
 import Data.List (find)
 import Data.Proxy (Proxy (..))
 import Data.Text (Text)
-import Language.Simple.Extension (Extension)
-import Language.Simple.Extension.SimpleUnification (SimpleUnification)
-import Language.Simple.Extension.TypeClass (TypeClass)
-import Language.Simple.Extension.TypeClassTypeFamily (TypeClassTypeFamily)
+import Language.Simple.ConstraintDomain (ConstraintDomain)
+import Language.Simple.ConstraintDomain.SimpleUnification (SimpleUnification)
+import Language.Simple.ConstraintDomain.TypeClass (TypeClass)
+import Language.Simple.ConstraintDomain.TypeClassTypeFamily (TypeClassTypeFamily)
 import qualified Language.Simple.Parser as Parser (parseProgram)
 import Language.Simple.Syntax (Program)
 import qualified Language.Simple.Type as Type (typeProgram)
@@ -35,43 +35,43 @@ handleError a = do
     Left err -> App (ExceptT (pure (Left (pretty err))))
     Right x -> pure x
 
-class Extension x => NamedExtension x where
-  extensionName :: String
+class ConstraintDomain x => NamedConstraintDomain x where
+  constraintDomainName :: String
 
-instance NamedExtension SimpleUnification where
-  extensionName = "simple"
+instance NamedConstraintDomain SimpleUnification where
+  constraintDomainName = "simple"
 
-instance NamedExtension TypeClass where
-  extensionName = "class"
+instance NamedConstraintDomain TypeClass where
+  constraintDomainName = "class"
 
-instance NamedExtension TypeClassTypeFamily where
-  extensionName = "class_family"
+instance NamedConstraintDomain TypeClassTypeFamily where
+  constraintDomainName = "class_family"
 
-data PackedExtension = forall x. NamedExtension x => PackedExtension (Proxy x)
+data PackedConstraintDomain = forall x. NamedConstraintDomain x => PackedConstraintDomain (Proxy x)
 
-availableExtensions :: [PackedExtension]
-availableExtensions =
-  [ PackedExtension (Proxy @SimpleUnification),
-    PackedExtension (Proxy @TypeClass),
-    PackedExtension (Proxy @TypeClassTypeFamily)
+availableConstraintDomains :: [PackedConstraintDomain]
+availableConstraintDomains =
+  [ PackedConstraintDomain (Proxy @SimpleUnification),
+    PackedConstraintDomain (Proxy @TypeClass),
+    PackedConstraintDomain (Proxy @TypeClassTypeFamily)
   ]
 
-getExtension :: String -> Maybe PackedExtension
-getExtension name = find f availableExtensions
+getConstraintDomain :: String -> Maybe PackedConstraintDomain
+getConstraintDomain name = find f availableConstraintDomains
   where
-    f (PackedExtension (Proxy :: Proxy x)) = extensionName @x == name
+    f (PackedConstraintDomain (Proxy :: Proxy x)) = constraintDomainName @x == name
 
-parseProgram :: Extension x => Text -> App x (Program x)
+parseProgram :: ConstraintDomain x => Text -> App x (Program x)
 parseProgram = handleError . Parser.parseProgram
 
-typeProgram :: Extension x => Program x -> App x ()
+typeProgram :: ConstraintDomain x => Program x -> App x ()
 typeProgram = handleError . Type.typeProgram
 
-runApp :: String -> (forall x. Extension x => App x a) -> IO a
-runApp extName app = runStdoutLoggingT $
-  case getExtension extName of
-    Just (PackedExtension (Proxy :: Proxy x)) -> runApp' $ app @x
-    Nothing -> logErrorN (docToText $ "unknown extension" <+> dquotes (pretty extName)) >> liftIO exitFailure
+runApp :: String -> (forall x. ConstraintDomain x => App x a) -> IO a
+runApp xName app = runStdoutLoggingT $
+  case getConstraintDomain xName of
+    Just (PackedConstraintDomain (Proxy :: Proxy x)) -> runApp' $ app @x
+    Nothing -> logErrorN (docToText $ "unknown constraint domain" <+> dquotes (pretty xName)) >> liftIO exitFailure
   where
     runApp' (App a) = do
       e <- runExceptT a

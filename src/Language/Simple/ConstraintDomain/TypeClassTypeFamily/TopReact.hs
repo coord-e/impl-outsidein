@@ -4,7 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 
-module Language.Simple.Extension.TypeClassTypeFamily.TopReact
+module Language.Simple.ConstraintDomain.TypeClassTypeFamily.TopReact
   ( topReactGiven,
     topReactWanted,
     TopReactOutput (..),
@@ -22,9 +22,9 @@ import qualified Data.HashSet as HashSet (member, singleton)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (filter, zip)
 import Data.Void (Void, vacuous)
-import Language.Simple.Extension (instantiate)
-import Language.Simple.Extension.TypeClassTypeFamily.Extension (ExtensionTypeError (..), TypeClassTypeFamily)
-import Language.Simple.Extension.TypeClassTypeFamily.Syntax
+import Language.Simple.ConstraintDomain (instantiate)
+import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension (ExtensionTypeError (..), TypeClassTypeFamily)
+import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax
   ( AtomicConstraint (..),
     ClassConstraint (..),
     ConstraintLocation (..),

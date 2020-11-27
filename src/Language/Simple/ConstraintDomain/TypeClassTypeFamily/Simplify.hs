@@ -1,13 +1,13 @@
 {-# LANGUAGE PatternSynonyms #-}
 
-module Language.Simple.Extension.TypeClassTypeFamily.Simplify (simplify) where
+module Language.Simple.ConstraintDomain.TypeClassTypeFamily.Simplify (simplify) where
 
 import Control.Monad (MonadPlus (..))
 import Control.Monad.Trans.Maybe (MaybeT)
 import qualified Data.HashSet as HashSet (member)
-import Language.Simple.Extension.TypeClassTypeFamily.Canonicalize (isCanonical)
-import Language.Simple.Extension.TypeClassTypeFamily.Extension (TypeClassTypeFamily)
-import Language.Simple.Extension.TypeClassTypeFamily.Syntax
+import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Canonicalize (isCanonical)
+import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension (TypeClassTypeFamily)
+import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax
   ( AtomicConstraint (..),
     fromAtomicConstraint,
     ftv,

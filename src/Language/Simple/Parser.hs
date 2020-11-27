@@ -42,7 +42,7 @@ import qualified Data.HashMap.Strict as HashMap (fromList)
 import Data.Text (Text, pack)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (fromList)
-import Language.Simple.Extension (ExtensionConstraint, ExtensionMonotype, SyntaxExtension (..))
+import Language.Simple.ConstraintDomain (ExtensionConstraint, ExtensionMonotype, SyntaxExtension (..))
 import Language.Simple.Syntax
   ( AxiomScheme (..),
     Binding (..),

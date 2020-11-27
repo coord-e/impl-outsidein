@@ -10,10 +10,10 @@ import Control.Monad.Logger (runNoLoggingT)
 import Data.Text (Text)
 import qualified Data.Text as Text (splitOn, strip, stripPrefix, takeWhile, unpack)
 import qualified Data.Text.IO as Text (readFile)
-import Language.Simple.Extension (Extension)
-import Language.Simple.Extension.SimpleUnification (SimpleUnification)
-import Language.Simple.Extension.TypeClass (TypeClass)
-import Language.Simple.Extension.TypeClassTypeFamily (TypeClassTypeFamily)
+import Language.Simple.ConstraintDomain (ConstraintDomain)
+import Language.Simple.ConstraintDomain.SimpleUnification (SimpleUnification)
+import Language.Simple.ConstraintDomain.TypeClass (TypeClass)
+import Language.Simple.ConstraintDomain.TypeClassTypeFamily (TypeClassTypeFamily)
 import Language.Simple.Parser (parseProgram)
 import Language.Simple.Type (typeProgram)
 import Prettyprinter (Pretty (..), defaultLayoutOptions, layoutPretty)
@@ -29,26 +29,26 @@ dataDir = "test/data/"
 makeTestForFile :: FilePath -> IO TestTree
 makeTestForFile path = do
   content <- Text.readFile (dataDir ++ path)
-  pure . testGroup path $ map (`toTest` content) (extractExtensions content)
+  pure . testGroup path $ map (`toTest` content) (extractXNames content)
   where
     isOk = isExtensionOf "ok" path
     extractXNames =
       maybe
-        (map fst extensions)
+        (map fst names)
         (map Text.strip . Text.splitOn ",")
         . Text.stripPrefix "// test:"
         . Text.takeWhile (/= '\n')
     toTest name =
-      case lookup name extensions of
+      case lookup name names of
         Just p -> testCase (Text.unpack name) . p isOk
-        Nothing -> error $ "unknown extension " ++ show name
-    extensions =
+        Nothing -> error $ "unknown constraint domain " ++ show name
+    names =
       [ ("simple", test @SimpleUnification),
         ("class", test @TypeClass),
         ("class_family", test @TypeClassTypeFamily)
       ]
 
-test :: forall x. Extension x => Bool -> Text -> Assertion
+test :: forall x. ConstraintDomain x => Bool -> Text -> Assertion
 test isOk content = runNoLoggingT $ do
   program <-
     runExceptT (parseProgram @x content) >>= \case

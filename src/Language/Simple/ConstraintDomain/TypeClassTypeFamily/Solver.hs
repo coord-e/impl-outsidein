@@ -6,7 +6,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wwarn=orphans #-}
 
-module Language.Simple.Extension.TypeClassTypeFamily.Solver
+module Language.Simple.ConstraintDomain.TypeClassTypeFamily.Solver
   (
   )
 where
@@ -17,13 +17,13 @@ import Control.Monad.Logger (MonadLogger)
 import Control.Monad.Trans.Maybe (MaybeT (..))
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet (member, toList)
-import Language.Simple.Extension (Extension (..))
-import Language.Simple.Extension.TypeClassTypeFamily.Canonicalize (CanonicalizeOutput (..), canonicalizeGiven, canonicalizeWanted)
-import Language.Simple.Extension.TypeClassTypeFamily.Extension (TypeClassTypeFamily)
-import Language.Simple.Extension.TypeClassTypeFamily.Interact (interact)
-import Language.Simple.Extension.TypeClassTypeFamily.Simplify (simplify)
-import Language.Simple.Extension.TypeClassTypeFamily.Syntax (AtomicConstraint (..), atomicConstraints, fromAtomicConstraint)
-import Language.Simple.Extension.TypeClassTypeFamily.TopReact (TopReactOutput (..), topReactGiven, topReactWanted)
+import Language.Simple.ConstraintDomain (ConstraintDomain (..))
+import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Canonicalize (CanonicalizeOutput (..), canonicalizeGiven, canonicalizeWanted)
+import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension (TypeClassTypeFamily)
+import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Interact (interact)
+import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Simplify (simplify)
+import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax (AtomicConstraint (..), atomicConstraints, fromAtomicConstraint)
+import Language.Simple.ConstraintDomain.TypeClassTypeFamily.TopReact (TopReactOutput (..), topReactGiven, topReactWanted)
 import Language.Simple.Fresh (Fresh)
 import Language.Simple.Syntax (Constraint (..), Monotype (..))
 import Language.Simple.Type.Constraint (UniVar, fuv)
@@ -37,7 +37,7 @@ import Prelude hiding (interact)
 
 type X = TypeClassTypeFamily
 
-instance Extension X where
+instance ConstraintDomain X where
   simplifyConstraint given tch wanted = do
     Quadruple {tch = tch', flatten, wanted = wanted'} <-
       fixStep $ Quadruple tch Subst.empty (atomicConstraints given) (atomicConstraints wanted)
