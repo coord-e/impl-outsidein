@@ -40,7 +40,7 @@ import qualified Data.HashMap.Strict as HashMap
     union,
   )
 import Data.HashSet (HashSet)
-import qualified Data.HashSet as HashSet (difference, toMap)
+import qualified Data.HashSet as HashSet (toMap)
 import Data.Hashable (Hashable)
 import Language.Simple.Fresh (Fresh (..))
 import Language.Simple.Syntax (Constraint (..), ExtensionConstraint, ExtensionMonotype, Monotype (..), TypeVar)
@@ -125,9 +125,7 @@ class Substitutable x a b | a b -> x where
 instance Substitutable x UniVar (Constraint x UniVar) => Substitutable x UniVar (GeneratedConstraint x) where
   substitute s (Constraint q) = Constraint (substitute s q)
   substitute s (ProductGeneratedConstraint c1 c2) = ProductGeneratedConstraint (substitute s c1) (substitute s c2)
-  substitute s@(Subst m) (ExistentialGeneratedConstraint vs p c) = ExistentialGeneratedConstraint vs' (substitute s p) (substitute s c)
-    where
-      vs' = HashSet.difference vs (HashMap.keysSet m)
+  substitute s (ExistentialGeneratedConstraint vs p c) = ExistentialGeneratedConstraint vs (substitute s p) (substitute s c)
 
 instance
   ( Substitutable x a (ExtensionConstraint x UniVar),
