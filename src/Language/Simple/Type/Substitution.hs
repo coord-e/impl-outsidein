@@ -14,7 +14,8 @@ module Language.Simple.Type.Substitution
     empty,
     member,
     singleton,
-    replace,
+    replaceAll,
+    replaceFound,
     fromBinders,
     Unifier,
     Instantiator,
@@ -90,8 +91,11 @@ compose ::
   Subst x a
 compose (Subst m1) (Subst m2) = Subst $ HashMap.union (fmap (substitute (Subst m1)) m2) m1
 
-replace :: MonadError (TypeError x) m => Instantiator x -> TypeVar -> m (Monotype x UniVar)
-replace m v = lookup v m `orThrow` UnboundTypeVar v
+replaceAll :: MonadError (TypeError x) m => Instantiator x -> TypeVar -> m (Monotype x UniVar)
+replaceAll m v = lookup v m `orThrow` UnboundTypeVar v
+
+replaceFound :: Applicative m => Instantiator x -> TypeVar -> m (Monotype x UniVar)
+replaceFound m v = pure (lookup v m `fromJustOr` VarType v)
 
 fromBinders :: (Fresh m, Foldable f) => f TypeVar -> m (Instantiator x)
 fromBinders = foldlM go empty

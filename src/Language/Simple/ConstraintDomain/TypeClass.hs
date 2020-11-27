@@ -50,7 +50,7 @@ import Language.Simple.Type.Constraint (Fuv (..), UniVar)
 import Language.Simple.Type.Env (HasProgramEnv (..))
 import Language.Simple.Type.Error (TypeError (..))
 import Language.Simple.Type.Substitution (Subst (..), Substitutable (..), Unifier)
-import qualified Language.Simple.Type.Substitution as Subst (compose, empty, fromBinders, null, replace, singleton)
+import qualified Language.Simple.Type.Substitution as Subst (compose, empty, fromBinders, null, replaceAll, singleton)
 import Language.Simple.Util (findDuplicate, foldMapM, uncons)
 import Prettyprinter (Pretty (..), hsep, squotes, (<+>))
 import Prettyprinter.Internal (unsafeTextWithoutNewlines)
@@ -240,6 +240,6 @@ instantiateClassAxiomScheme vars constraint head
   | Just v <- findDuplicate vars = throwError $ ConflictingTypeVars v
   | otherwise = do
     instantiator <- Subst.fromBinders vars
-    c <- instantiate (Subst.replace instantiator) constraint
-    h <- instantiate (Subst.replace instantiator) head
+    c <- instantiate (Subst.replaceAll instantiator) constraint
+    h <- instantiate (Subst.replaceAll instantiator) head
     pure (c, h)

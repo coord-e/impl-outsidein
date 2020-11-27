@@ -41,7 +41,7 @@ import Language.Simple.Type.Constraint (UniVar, fuv)
 import Language.Simple.Type.Env (HasProgramEnv (..))
 import Language.Simple.Type.Error (TypeError (..))
 import Language.Simple.Type.Substitution (Instantiator, Subst (..), substitute)
-import qualified Language.Simple.Type.Substitution as Subst (compose, empty, fromBinders, replace, singleton)
+import qualified Language.Simple.Type.Substitution as Subst (empty, fromBinders, replaceFound, singleton)
 import Language.Simple.Util (findDuplicate, firstJust)
 import Prelude hiding (head)
 
@@ -74,7 +74,7 @@ topReactClass l q@(ClassAtomicConstraint k (FamilyFreeSeq ts)) = do
       Subst onlyPredicateSubst <- Subst.fromBinders onlyPredicateVars
       -- TODO: deal with raw subst manipulation
       let instantiator = Subst $ HashMap.union subst onlyPredicateSubst
-      output <- instantiate (Subst.replace instantiator) predicate
+      output <- instantiate (Subst.replaceFound instantiator) predicate
       let tch = foldMap fuv $ HashMap.elems onlyPredicateSubst
       pure TopReactOutput {tch, output}
 topReactClass _ _ = mzero
@@ -92,7 +92,7 @@ topReactFamily l (EqualityAtomicConstraint (FamilyApplyType k (FamilyFreeSeq ts)
   Subst onlyRhsSubst <- Subst.fromBinders onlyRhsVars
   -- TODO: deal with raw subst manipulation
   let instantiator = Subst $ HashMap.union subst onlyRhsSubst
-  rhs' <- instantiate (Subst.replace instantiator) rhs
+  rhs' <- instantiate (Subst.replaceFound instantiator) rhs
   pure TopReactOutput {tch = tchOf l onlyRhsSubst, output = EqualityConstraint rhs' t}
   where
     tchOf Wanted = foldMap fuv . HashMap.elems

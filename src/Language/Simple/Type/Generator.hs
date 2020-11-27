@@ -41,7 +41,7 @@ import Language.Simple.Type.Constraint (Fuv (..), GeneratedConstraint (..), UniV
 import Language.Simple.Type.Env (HasLocalTypeEnv (..), HasProgramEnv (..), HasTypeEnv (..))
 import Language.Simple.Type.Error (TypeError (..))
 import Language.Simple.Type.Substitution (Instantiator, Subst (..))
-import qualified Language.Simple.Type.Substitution as Subst (replace)
+import qualified Language.Simple.Type.Substitution as Subst (replaceAll)
 import Language.Simple.Util (foldMapM, orThrowM)
 
 generateConstraint ::
@@ -186,7 +186,7 @@ instantiateMonotype ::
   Instantiator x ->
   SimpleMonotype x ->
   m (Monotype x UniVar)
-instantiateMonotype = instantiate . Subst.replace
+instantiateMonotype = instantiate . Subst.replaceAll
 
 instantiateConstraint ::
   ( Instantiable x (Constraint x),
@@ -195,7 +195,7 @@ instantiateConstraint ::
   Instantiator x ->
   SimpleConstraint x ->
   m (Constraint x UniVar)
-instantiateConstraint = instantiate . Subst.replace
+instantiateConstraint = instantiate . Subst.replaceAll
 
 findDataCtor :: (HasProgramEnv x m, MonadError (TypeError x) m) => DataCtor -> m (DataCtorType x)
 findDataCtor k = lookupDataCtor k `orThrowM` UnboundDataCtor k
