@@ -45,12 +45,12 @@ import qualified Language.Simple.ConstraintDomain.SimpleUnification as U (Extens
 import Language.Simple.ConstraintDomain.Util (Ftv (..), Tv, matchTypes)
 import Language.Simple.Fresh (Fresh (..))
 import Language.Simple.Parser (atomMonotypeParser, upperName)
-import Language.Simple.Syntax (AxiomScheme (..), Constraint (..), Monotype (..), TypeVar, prettyAtomMonotype)
+import Language.Simple.Syntax (AxiomScheme (..), Constraint (..), Monotype (..), prettyAtomMonotype)
 import Language.Simple.Type.Constraint (Fuv (..), UniVar)
 import Language.Simple.Type.Env (HasProgramEnv (..))
 import Language.Simple.Type.Error (TypeError (..))
 import Language.Simple.Type.Substitution (Subst (..), Substitutable (..))
-import qualified Language.Simple.Type.Substitution as Subst (compose, empty, null, replaceFound)
+import qualified Language.Simple.Type.Substitution as Subst (compose, empty, null)
 import Language.Simple.Util (findDuplicate, foldMapM)
 import Prettyprinter (Pretty (..), hsep, squotes, (<+>))
 import Prettyprinter.Internal (unsafeTextWithoutNewlines)
@@ -101,6 +101,9 @@ instance Instantiable X (ExtensionMonotype X) where
 instance Substitutable X UniVar (ExtensionMonotype X a) where
   substitute _ = discardMonotypeExt
 
+instance Substitutable X Tv (ExtensionMonotype X a) where
+  substitute _ = discardMonotypeExt
+
 instance SyntaxExtension X (ExtensionMonotype X) where
   extensionParser = empty
 
@@ -126,6 +129,9 @@ instance Instantiable X (ExtensionConstraint X) where
   instantiate f (TypeClassConstraint k ts) = TypeClassConstraint k <$> traverse (instantiate f) ts
 
 instance Substitutable X UniVar (ExtensionConstraint X UniVar) where
+  substitute s (TypeClassConstraint k ts) = TypeClassConstraint k $ fmap (substitute s) ts
+
+instance Substitutable X Tv (ExtensionConstraint X UniVar) where
   substitute s (TypeClassConstraint k ts) = TypeClassConstraint k $ fmap (substitute s) ts
 
 instance SyntaxExtension X (ExtensionConstraint X) where
@@ -211,11 +217,11 @@ findInstance q [] = getAxiomSchemes >>= go . Vector.toList
     go (ForallAxiomScheme {vars, constraint, head = ExtensionConstraint head} : _)
       | Just subst <- matchClass (vacuous head) q = do
         forM_ (findDuplicate vars) $ throwError . ConflictingTypeVars
-        constraint' <- instantiate (Subst.replaceFound subst) constraint
+        let constraint' = substitute subst (vacuous constraint)
         pure . Just $ splitConstraint constraint'
     go (_ : t) = go t
 
-matchClass :: ExtensionConstraint X UniVar -> ExtensionConstraint X UniVar -> Maybe (Subst X TypeVar)
+matchClass :: ExtensionConstraint X UniVar -> ExtensionConstraint X UniVar -> Maybe (Subst X Tv)
 matchClass (TypeClassConstraint k1 ts1) (TypeClassConstraint k2 ts2)
   | k1 == k2 = matchTypes ts1 ts2
   | otherwise = Nothing

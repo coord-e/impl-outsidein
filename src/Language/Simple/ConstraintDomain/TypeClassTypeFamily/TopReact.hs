@@ -21,7 +21,6 @@ import qualified Data.HashSet as HashSet (member, singleton)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (filter)
 import Data.Void (Void, vacuous)
-import Language.Simple.ConstraintDomain (instantiate)
 import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension (ExtensionTypeError (..), TypeClassTypeFamily)
 import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax
   ( AtomicConstraint (..),
@@ -34,14 +33,14 @@ import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax
     pattern FamilyFreeSeq,
     pattern TypeClassConstraint,
   )
-import Language.Simple.ConstraintDomain.Util (matchTypes)
+import Language.Simple.ConstraintDomain.Util (Tv (..), matchTypes)
 import Language.Simple.Fresh (Fresh)
 import Language.Simple.Syntax (AxiomScheme (..), Constraint (..), Monotype (..), TypeVar)
 import Language.Simple.Type.Constraint (UniVar, fuv)
 import Language.Simple.Type.Env (HasProgramEnv (..))
 import Language.Simple.Type.Error (TypeError (..))
-import Language.Simple.Type.Substitution (Subst (..))
-import qualified Language.Simple.Type.Substitution as Subst (fromBinders, replaceFound)
+import Language.Simple.Type.Substitution (Subst (..), substitute)
+import qualified Language.Simple.Type.Substitution as Subst (fromBinders)
 import Language.Simple.Util (findDuplicate, firstJust)
 import Prelude hiding (head)
 
@@ -71,10 +70,10 @@ topReactClass l q@(ClassAtomicConstraint k (FamilyFreeSeq ts)) = do
   case l of
     Given -> throwError . ExtensionTypeError $ MatchingGivenConstraint (fromAtomicConstraint q)
     Wanted -> do
-      Subst onlyPredicateSubst <- Subst.fromBinders onlyPredicateVars
+      Subst onlyPredicateSubst <- Subst.fromBinders $ fmap RigidTv onlyPredicateVars
       -- TODO: deal with raw subst manipulation
-      let instantiator = Subst $ HashMap.union subst onlyPredicateSubst
-      output <- instantiate (Subst.replaceFound instantiator) predicate
+      let subst' = Subst $ HashMap.union subst onlyPredicateSubst
+      let output = substitute subst' (vacuous predicate)
       let tch = foldMap fuv $ HashMap.elems onlyPredicateSubst
       pure TopReactOutput {tch, output}
 topReactClass _ _ = mzero
@@ -89,10 +88,10 @@ topReactFamily ::
   MaybeT m TopReactOutput
 topReactFamily l (EqualityAtomicConstraint (FamilyApplyType k (FamilyFreeSeq ts)) (FamilyFree t)) = do
   MatchingFamilyAxiom {onlyRhsVars, rhs, subst = Subst subst} <- findMatchingFamilyAxiom (FamilyType k ts)
-  Subst onlyRhsSubst <- Subst.fromBinders onlyRhsVars
+  Subst onlyRhsSubst <- Subst.fromBinders $ fmap RigidTv onlyRhsVars
   -- TODO: deal with raw subst manipulation
-  let instantiator = Subst $ HashMap.union subst onlyRhsSubst
-  rhs' <- instantiate (Subst.replaceFound instantiator) rhs
+  let subst' = Subst $ HashMap.union subst onlyRhsSubst
+  let rhs' = substitute subst' (vacuous rhs)
   pure TopReactOutput {tch = tchOf l onlyRhsSubst, output = EqualityConstraint rhs' t}
   where
     tchOf Wanted = foldMap fuv . HashMap.elems
@@ -102,7 +101,7 @@ topReactFamily _ _ = mzero
 data MatchingClassAxiom = MatchingClassAxiom
   { onlyPredicateVars :: Vector TypeVar,
     predicate :: Constraint X Void,
-    subst :: Subst X TypeVar
+    subst :: Subst X Tv
   }
 
 findMatchingClassAxiom ::
@@ -126,7 +125,7 @@ findMatchingClassAxiom cls = do
 data MatchingFamilyAxiom = MatchingFamilyAxiom
   { onlyRhsVars :: Vector TypeVar,
     rhs :: Monotype X Void,
-    subst :: Subst X TypeVar
+    subst :: Subst X Tv
   }
 
 findMatchingFamilyAxiom ::
@@ -157,12 +156,12 @@ frv (VarType v) = HashSet.singleton v
 frv (ApplyType _ ts) = foldMap frv ts
 frv (FamilyApplyType _ ts) = foldMap frv ts
 
-matchClass :: ClassConstraint Void -> ClassConstraint UniVar -> Maybe (Subst X TypeVar)
+matchClass :: ClassConstraint Void -> ClassConstraint UniVar -> Maybe (Subst X Tv)
 matchClass (ClassConstraint k1 ts1) (ClassConstraint k2 ts2)
   | k1 == k2 = matchTypes (fmap vacuous ts1) ts2
   | otherwise = Nothing
 
-matchFamily :: FamilyType Void -> FamilyType UniVar -> Maybe (Subst X TypeVar)
+matchFamily :: FamilyType Void -> FamilyType UniVar -> Maybe (Subst X Tv)
 matchFamily (FamilyType k1 ts1) (FamilyType k2 ts2)
   | k1 == k2 = matchTypes (fmap vacuous ts1) ts2
   | otherwise = Nothing

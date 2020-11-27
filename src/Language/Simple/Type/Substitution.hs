@@ -16,7 +16,6 @@ module Language.Simple.Type.Substitution
     member,
     singleton,
     replaceAll,
-    replaceFound,
     fromBinders,
     Unifier,
     Instantiator,
@@ -109,10 +108,7 @@ merge c p (Subst m1) (Subst m2)
 replaceAll :: MonadError (TypeError x) m => Instantiator x -> TypeVar -> m (Monotype x UniVar)
 replaceAll m v = lookup v m `orThrow` UnboundTypeVar v
 
-replaceFound :: Applicative m => Instantiator x -> TypeVar -> m (Monotype x UniVar)
-replaceFound m v = pure (lookup v m `fromJustOr` VarType v)
-
-fromBinders :: (Fresh m, Foldable f) => f TypeVar -> m (Instantiator x)
+fromBinders :: (Eq a, Hashable a, Fresh m, Foldable f) => f a -> m (Subst x a)
 fromBinders = foldlM go empty
   where
     go (Subst subst) v = do

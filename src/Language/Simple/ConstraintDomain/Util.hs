@@ -89,20 +89,20 @@ instance
 
 -- one-way matching, ignoring extension constructor
 
-matchType :: Monotype x UniVar -> Monotype x UniVar -> Maybe (Subst x TypeVar)
-matchType (VarType v1) (VarType v2) | v1 == v2 = Just Subst.empty
-matchType (VarType v) t = Just $ Subst.singleton v t
+matchType :: Monotype x UniVar -> Monotype x UniVar -> Maybe (Subst x Tv)
+matchType (TvType v1) (TvType v2) | v1 == v2 = Just Subst.empty
+matchType (TvType v) t = Just $ Subst.singleton v t
 matchType (ApplyType k1 ts1) (ApplyType k2 ts2) | k1 == k2 = matchTypes ts1 ts2
 matchType _ _ = Nothing
 
-matchTypes :: Vector (Monotype x UniVar) -> Vector (Monotype x UniVar) -> Maybe (Subst x TypeVar)
+matchTypes :: Vector (Monotype x UniVar) -> Vector (Monotype x UniVar) -> Maybe (Subst x Tv)
 matchTypes ts1 ts2
   | length ts1 == length ts2 = foldlM go Subst.empty $ Vector.zip ts1 ts2
   | otherwise = Nothing
   where
     go s1 (t1, t2) = do
       s2 <- matchType t1 t2
-      Subst.merge VarType simpleEqual s1 s2
+      Subst.merge TvType simpleEqual s1 s2
     simpleEqual (TvType v1) (TvType v2) = v1 == v2
     simpleEqual (ApplyType k1 ts1') (ApplyType k2 ts2') = k1 == k2 && simpleEquals ts1' ts2'
     simpleEqual _ _ = False
