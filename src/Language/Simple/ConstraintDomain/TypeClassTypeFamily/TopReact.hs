@@ -15,12 +15,11 @@ import Control.Monad (MonadPlus (..), forM_)
 import Control.Monad.Except (MonadError (..))
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe (MaybeT (..))
-import Data.Foldable (foldlM)
 import qualified Data.HashMap.Strict as HashMap (elems, union)
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet (member, singleton)
 import Data.Vector (Vector)
-import qualified Data.Vector as Vector (filter, zip)
+import qualified Data.Vector as Vector (filter)
 import Data.Void (Void, vacuous)
 import Language.Simple.ConstraintDomain (instantiate)
 import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension (ExtensionTypeError (..), TypeClassTypeFamily)
@@ -35,13 +34,14 @@ import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax
     pattern FamilyFreeSeq,
     pattern TypeClassConstraint,
   )
+import Language.Simple.ConstraintDomain.Util (matchTypes)
 import Language.Simple.Fresh (Fresh)
 import Language.Simple.Syntax (AxiomScheme (..), Constraint (..), Monotype (..), TypeVar)
 import Language.Simple.Type.Constraint (UniVar, fuv)
 import Language.Simple.Type.Env (HasProgramEnv (..))
 import Language.Simple.Type.Error (TypeError (..))
-import Language.Simple.Type.Substitution (Instantiator, Subst (..), substitute)
-import qualified Language.Simple.Type.Substitution as Subst (empty, fromBinders, replaceFound, singleton)
+import Language.Simple.Type.Substitution (Subst (..))
+import qualified Language.Simple.Type.Substitution as Subst (fromBinders, replaceFound)
 import Language.Simple.Util (findDuplicate, firstJust)
 import Prelude hiding (head)
 
@@ -102,7 +102,7 @@ topReactFamily _ _ = mzero
 data MatchingClassAxiom = MatchingClassAxiom
   { onlyPredicateVars :: Vector TypeVar,
     predicate :: Constraint X Void,
-    subst :: Instantiator X
+    subst :: Subst X TypeVar
   }
 
 findMatchingClassAxiom ::
@@ -126,7 +126,7 @@ findMatchingClassAxiom cls = do
 data MatchingFamilyAxiom = MatchingFamilyAxiom
   { onlyRhsVars :: Vector TypeVar,
     rhs :: Monotype X Void,
-    subst :: Instantiator X
+    subst :: Subst X TypeVar
   }
 
 findMatchingFamilyAxiom ::
@@ -157,27 +157,12 @@ frv (VarType v) = HashSet.singleton v
 frv (ApplyType _ ts) = foldMap frv ts
 frv (FamilyApplyType _ ts) = foldMap frv ts
 
-matchClass :: ClassConstraint Void -> ClassConstraint UniVar -> Maybe (Instantiator X)
+matchClass :: ClassConstraint Void -> ClassConstraint UniVar -> Maybe (Subst X TypeVar)
 matchClass (ClassConstraint k1 ts1) (ClassConstraint k2 ts2)
   | k1 == k2 = matchTypes (fmap vacuous ts1) ts2
   | otherwise = Nothing
 
-matchFamily :: FamilyType Void -> FamilyType UniVar -> Maybe (Instantiator X)
+matchFamily :: FamilyType Void -> FamilyType UniVar -> Maybe (Subst X TypeVar)
 matchFamily (FamilyType k1 ts1) (FamilyType k2 ts2)
   | k1 == k2 = matchTypes (fmap vacuous ts1) ts2
   | otherwise = Nothing
-
-matchType :: Monotype X UniVar -> Monotype X UniVar -> Maybe (Instantiator X)
-matchType (VarType v1) (VarType v2) | v1 == v2 = Just Subst.empty
-matchType (VarType v) t = Just $ Subst.singleton v t
-matchType (ApplyType k1 ts1) (ApplyType k2 ts2) | k1 == k2 = matchTypes ts1 ts2
-matchType _ _ = Nothing
-
-matchTypes :: Vector (Monotype X UniVar) -> Vector (Monotype X UniVar) -> Maybe (Instantiator X)
-matchTypes ts1 ts2
-  | length ts1 == length ts2 = foldlM go Subst.empty $ Vector.zip ts1 ts2
-  | otherwise = Nothing
-  where
-    go acc (t1, t2) = do
-      s <- matchType (substitute acc t1) (substitute acc t2)
-      pure $ Subst.compose s acc

@@ -8,6 +8,7 @@ module Language.Simple.Type.Substitution
   ( Subst (..),
     limit,
     compose,
+    merge,
     domain,
     null,
     lookup,
@@ -90,6 +91,20 @@ compose ::
   Subst x a ->
   Subst x a
 compose (Subst m1) (Subst m2) = Subst $ HashMap.union (fmap (substitute (Subst m1)) m2) m1
+
+merge ::
+  (Eq a, Hashable a, MonadFail m) =>
+  (a -> Monotype x UniVar) ->
+  (Monotype x UniVar -> Monotype x UniVar -> Bool) ->
+  Subst x a ->
+  Subst x a ->
+  m (Subst x a)
+merge c p (Subst m1) (Subst m2)
+  | agree = pure . Subst $ HashMap.union m1 m2
+  | otherwise = fail "Subst.merge"
+  where
+    agree = all check (HashMap.keysSet (m1 `HashMap.intersection` m2))
+    check v = p (HashMap.lookup v m1 `fromJustOr` c v) (HashMap.lookup v m2 `fromJustOr` c v)
 
 replaceAll :: MonadError (TypeError x) m => Instantiator x -> TypeVar -> m (Monotype x UniVar)
 replaceAll m v = lookup v m `orThrow` UnboundTypeVar v

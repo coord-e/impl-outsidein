@@ -13,18 +13,24 @@ module Language.Simple.ConstraintDomain.Util
     Ftv (..),
     pattern TvType,
     isTvType,
+    matchType,
+    matchTypes,
   )
 where
 
+import Data.Foldable (foldlM)
 import qualified Data.HashMap.Strict as HashMap (lookup)
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet (empty, singleton, union)
 import Data.Hashable (Hashable)
+import Data.Vector (Vector)
+import qualified Data.Vector as Vector (zip)
 import GHC.Generics (Generic)
 import Language.Simple.ConstraintDomain (ExtensionConstraint, ExtensionMonotype)
 import Language.Simple.Syntax (Constraint (..), Monotype (..), TypeVar)
 import Language.Simple.Type.Constraint (UniVar)
 import Language.Simple.Type.Substitution (Subst (..), Substitutable (..))
+import qualified Language.Simple.Type.Substitution as Subst (empty, merge, singleton)
 import Language.Simple.Util (fromJustOr)
 import Prettyprinter (Pretty (..))
 
@@ -80,3 +86,24 @@ instance
   ftv (ProductConstraint q1 q2) = HashSet.union (ftv q1) (ftv q2)
   ftv (EqualityConstraint t1 t2) = HashSet.union (ftv t1) (ftv t2)
   ftv (ExtensionConstraint x) = ftv x
+
+-- one-way matching, ignoring extension constructor
+
+matchType :: Monotype x UniVar -> Monotype x UniVar -> Maybe (Subst x TypeVar)
+matchType (VarType v1) (VarType v2) | v1 == v2 = Just Subst.empty
+matchType (VarType v) t = Just $ Subst.singleton v t
+matchType (ApplyType k1 ts1) (ApplyType k2 ts2) | k1 == k2 = matchTypes ts1 ts2
+matchType _ _ = Nothing
+
+matchTypes :: Vector (Monotype x UniVar) -> Vector (Monotype x UniVar) -> Maybe (Subst x TypeVar)
+matchTypes ts1 ts2
+  | length ts1 == length ts2 = foldlM go Subst.empty $ Vector.zip ts1 ts2
+  | otherwise = Nothing
+  where
+    go s1 (t1, t2) = do
+      s2 <- matchType t1 t2
+      Subst.merge VarType simpleEqual s1 s2
+    simpleEqual (TvType v1) (TvType v2) = v1 == v2
+    simpleEqual (ApplyType k1 ts1') (ApplyType k2 ts2') = k1 == k2 && simpleEquals ts1' ts2'
+    simpleEqual _ _ = False
+    simpleEquals v1 v2 = all (uncurry simpleEqual) (Vector.zip v1 v2)

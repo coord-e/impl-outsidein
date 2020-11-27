@@ -10,7 +10,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Language.Simple.ConstraintDomain.TypeClass
   ( TypeClass,
@@ -19,13 +18,14 @@ module Language.Simple.ConstraintDomain.TypeClass
 where
 
 import Control.Applicative (empty, many)
+import Control.Monad (forM_)
 import Control.Monad.Except (MonadError (..))
 import Data.Hashable (Hashable)
 import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Vector (Vector)
-import qualified Data.Vector as Vector (fromList, null, toList)
-import Data.Void (Void)
+import qualified Data.Vector as Vector (fromList, toList)
+import Data.Void (vacuous)
 import GHC.Generics (Generic)
 import Language.Simple.ConstraintDomain
   ( ConstraintDomain (..),
@@ -42,16 +42,16 @@ import Language.Simple.ConstraintDomain.SimpleUnification
     toXConstraint,
   )
 import qualified Language.Simple.ConstraintDomain.SimpleUnification as U (ExtensionTypeError (..), toXType)
-import Language.Simple.ConstraintDomain.Util (Ftv (..), Tv)
+import Language.Simple.ConstraintDomain.Util (Ftv (..), Tv, matchTypes)
 import Language.Simple.Fresh (Fresh (..))
 import Language.Simple.Parser (atomMonotypeParser, upperName)
 import Language.Simple.Syntax (AxiomScheme (..), Constraint (..), Monotype (..), TypeVar, prettyAtomMonotype)
 import Language.Simple.Type.Constraint (Fuv (..), UniVar)
 import Language.Simple.Type.Env (HasProgramEnv (..))
 import Language.Simple.Type.Error (TypeError (..))
-import Language.Simple.Type.Substitution (Subst (..), Substitutable (..), Unifier)
-import qualified Language.Simple.Type.Substitution as Subst (compose, empty, fromBinders, null, replaceAll, singleton)
-import Language.Simple.Util (findDuplicate, foldMapM, uncons)
+import Language.Simple.Type.Substitution (Subst (..), Substitutable (..))
+import qualified Language.Simple.Type.Substitution as Subst (compose, empty, null, replaceFound)
+import Language.Simple.Util (findDuplicate, foldMapM)
 import Prettyprinter (Pretty (..), hsep, squotes, (<+>))
 import Prettyprinter.Internal (unsafeTextWithoutNewlines)
 import Text.Parser.Token (TokenParsing)
@@ -203,49 +203,19 @@ findInstance ::
   [ExtensionConstraint X UniVar] ->
   m (Maybe SplitConstraint)
 findInstance q (h : t)
-  | isJust (match h q) = pure $ Just mempty
+  | isJust (matchClass h q) = pure $ Just mempty
   | otherwise = findInstance q t
 findInstance q [] = getAxiomSchemes >>= go . Vector.toList
   where
     go [] = pure Nothing
-    go (ForallAxiomScheme {vars, constraint, head = ExtensionConstraint head} : t) = do
-      (constraint', head') <- instantiateClassAxiomScheme vars constraint head
-      case match head' q of
-        Just u -> pure . Just . splitConstraint $ substitute u constraint'
-        Nothing -> go t
+    go (ForallAxiomScheme {vars, constraint, head = ExtensionConstraint head} : _)
+      | Just subst <- matchClass (vacuous head) q = do
+        forM_ (findDuplicate vars) $ throwError . ConflictingTypeVars
+        constraint' <- instantiate (Subst.replaceFound subst) constraint
+        pure . Just $ splitConstraint constraint'
     go (_ : t) = go t
 
-match :: ExtensionConstraint X UniVar -> ExtensionConstraint X UniVar -> Maybe (Unifier X)
-match (TypeClassConstraint k1 ts1) (TypeClassConstraint k2 ts2)
-  | k1 == k2 = matchTypeAll ts1 ts2
+matchClass :: ExtensionConstraint X UniVar -> ExtensionConstraint X UniVar -> Maybe (Subst X TypeVar)
+matchClass (TypeClassConstraint k1 ts1) (TypeClassConstraint k2 ts2)
+  | k1 == k2 = matchTypes ts1 ts2
   | otherwise = Nothing
-
-matchTypeAll :: Vector (Monotype X UniVar) -> Vector (Monotype X UniVar) -> Maybe (Unifier X)
-matchTypeAll ts1 ts2 | Vector.null ts1 && Vector.null ts2 = Just Subst.empty
-matchTypeAll (uncons -> Just (h1, t1)) (uncons -> Just (h2, t2)) = do
-  u1 <- matchType h1 h2
-  u2 <- matchTypeAll t1 t2
-  pure $ Subst.compose u1 u2
-matchTypeAll _ _ = Nothing
-
-matchType :: Monotype X UniVar -> Monotype X UniVar -> Maybe (Unifier X)
-matchType (UniType u) t = Just $ Subst.singleton u t
-matchType (VarType v1) (VarType v2) | v1 == v2 = Just Subst.empty
-matchType (ApplyType k1 ts1) (ApplyType k2 ts2) | k1 == k2 = matchTypeAll ts1 ts2
-matchType _ _ = Nothing
-
-instantiateClassAxiomScheme ::
-  ( Fresh m,
-    MonadError (TypeError X) m
-  ) =>
-  Vector TypeVar ->
-  Constraint X Void ->
-  ExtensionConstraint X Void ->
-  m (Constraint X UniVar, ExtensionConstraint X UniVar)
-instantiateClassAxiomScheme vars constraint head
-  | Just v <- findDuplicate vars = throwError $ ConflictingTypeVars v
-  | otherwise = do
-    instantiator <- Subst.fromBinders vars
-    c <- instantiate (Subst.replaceAll instantiator) constraint
-    h <- instantiate (Subst.replaceAll instantiator) head
-    pure (c, h)
