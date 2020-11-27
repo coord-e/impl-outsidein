@@ -1,2 +1,2 @@
-data Pack :: exists a. a -> Bottom
+data Pack :: exists a. a -> Any
 let x = case (Pack 1) { Pack n => n }

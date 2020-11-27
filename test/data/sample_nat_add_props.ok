@@ -11,7 +11,7 @@ data SS :: forall a n. (a ~ S n) => SNat n -> SNat a
 
 data Refl :: forall a b. (a ~ b) => Eq a b
 
-let plusComm :: forall a b. SNat a -> SNat b -> Eq <Add a b> <Add b a>
+let plusComm :: forall n m. SNat n -> SNat m -> Eq <Add n m> <Add m n>
   = \n. \m. case n {
     SZ => case plusZRight m {
       Refl => Refl
@@ -23,7 +23,7 @@ let plusComm :: forall a b. SNat a -> SNat b -> Eq <Add a b> <Add b a>
     }
   }
 
-let plusZRight :: forall a. SNat a -> Eq <Add a Z> a
+let plusZRight :: forall n. SNat n -> Eq <Add n Z> n
   = \n. case n {
     SZ => Refl,
     SS m => case plusZRight m {
@@ -31,7 +31,7 @@ let plusZRight :: forall a. SNat a -> Eq <Add a Z> a
     }
   }
 
-let plusSRight :: forall a b. SNat a -> SNat b -> Eq <Add a (S b)> (S <Add a b>)
+let plusSRight :: forall n m. SNat n -> SNat m -> Eq <Add n (S m)> (S <Add n m>)
   = \n. \m. case n {
     SZ => Refl,
     SS n2 => case plusSRight n2 m {
