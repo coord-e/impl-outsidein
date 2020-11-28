@@ -5,8 +5,8 @@ license:         BSD-3-Clause
 license-file:    LICENSE.md
 maintainer:      coord_e <me@coord-e.com>
 author:          coord_e
-homepage:        https://github.com/coord-e/outsidein
-bug-reports:     https://github.com/coord-e/outsidein/issues
+homepage:        https://github.com/coord-e/impl-outsidein
+bug-reports:     https://github.com/coord-e/impl-outsidein/issues
 synopsis:        Toy implementation of OutsideIn(X)
 description:     Toy implementation of OutsideIn(X).
 build-type:      Simple
@@ -16,7 +16,7 @@ extra-doc-files:
 
 source-repository head
     type:     git
-    location: https://github.com/coord-e/outsidein
+    location: https://github.com/coord-e/impl-outsidein
 
 library
     exposed-modules:

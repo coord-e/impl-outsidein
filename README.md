@@ -1,6 +1,6 @@
 # Toy implementation of OutsideIn(X)
 
-[![Actions Status](https://github.com/coord-e/outsidein/workflows/CI/badge.svg)](https://github.com/coord-e/outsidein/actions?workflow=CI)
+[![Actions Status](https://github.com/coord-e/impl-outsidein/workflows/CI/badge.svg)](https://github.com/coord-e/impl-outsidein/actions?workflow=CI)
 
 This repository contains the toy implementation of OutsideIn(X) type inference algorithm[[1]](#1), along with the following instantiation of constraint domain X:
 
