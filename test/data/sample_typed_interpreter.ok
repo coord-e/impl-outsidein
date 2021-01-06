@@ -1,0 +1,22 @@
+data P :: forall a b. a -> b -> P a b
+data Lit :: forall a. (a ~ Int) => Int -> Term a
+data Inc :: forall a. (a ~ Int) => Term Int -> Term a
+data IsZ :: forall a. (a ~ Bool) => Term Int -> Term a
+data Pair :: forall a b c. (c ~ P a b) => Term a -> Term b -> Term c
+data Fst :: forall a b. Term (P a b) -> Term a
+data Snd :: forall a b. Term (P a b) -> Term b
+
+type plus :: Int -> Int -> Int
+type eq :: Int -> Int -> Bool
+type fst :: forall a b. P a b -> a
+type snd :: forall a b. P a b -> b
+
+let eval :: forall a. Term a -> a
+  = \x. case x {
+    Lit i => i,
+    Inc t => plus (eval t) 1,
+    IsZ t => eq (eval t) 0,
+    Pair a b => P (eval a) (eval b),
+    Fst t => fst (eval t),
+    Snd t => snd (eval t),
+  }

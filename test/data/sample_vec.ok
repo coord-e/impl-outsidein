@@ -1,0 +1,46 @@
+// test: class_family
+
+data Z :: Z
+data S :: forall n. n -> S n
+
+data SZ :: forall a. (a ~ Z) => SNat a
+data SS :: forall a n. (a ~ S n) => SNat n -> SNat a
+
+data VZ :: forall a n. (n ~ Z) => Vec n a
+data VS :: forall a n. exists m. (n ~ S m) => a -> Vec m a -> Vec n a
+
+axiom forall m. <Add Z m> ~ m
+axiom forall n m. <Add (S n) m> ~ S <Add n m>
+
+let append :: forall n m a. Vec n a -> Vec m a -> Vec <Add n m> a
+  = \v1. \v2. case v1 {
+    VZ => v2,
+    VS x xs => VS x (append xs v2),
+  }
+
+let map :: forall n a b. (a -> b) -> Vec n a -> Vec n b
+  = \f. \v. case v {
+    VZ => VZ,
+    VS x xs => VS (f x) (map f xs),
+  }
+
+type addInt :: Int -> Int -> Int
+
+let add :: forall n. Vec n Int -> Vec n Int -> Vec n Int
+  = \a. \b. case a {
+    VZ => case b {
+      VZ => VZ
+    },
+    VS x xs => case b {
+      VS y ys => VS (addInt x y) (add xs ys)
+    }
+  }
+
+axiom forall a b. <Arity Z a b> ~ b
+axiom forall a b n. <Arity (S n) a b> ~ a -> <Arity n a b>
+
+let apply :: forall n a b. <Arity n a b> -> Vec n a -> b
+  = \f. \v. case v {
+    VZ => f,
+    VS x xs => apply (f x) xs
+  }
