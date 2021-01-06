@@ -52,7 +52,7 @@ isSmaller :: Monotype X UniVar -> Monotype X UniVar -> Bool
 isSmaller (FamilyApplyType _ _) t = not (isFamilyType t)
 isSmaller (UniType _) (VarType _) = True
 isSmaller (TvType v1) (TvType v2) = v1 < v2
-isSmaller (TvType _) t = not (isFamilyType t)
+isSmaller (TvType _) t = not (isFamilyType t) -- modified from Fig. 20
 isSmaller _ _ = False
 
 -- Fig. 21
