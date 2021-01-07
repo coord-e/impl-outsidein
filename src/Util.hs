@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.Simple.Util
+module Util
   ( orThrow,
     orThrowM,
     foldMapM,

@@ -41,7 +41,7 @@ import Language.Simple.Type.Env (HasProgramEnv (..))
 import Language.Simple.Type.Error (TypeError (..))
 import Language.Simple.Type.Substitution (Subst (..), substitute)
 import qualified Language.Simple.Type.Substitution as Subst (fromBinders)
-import Language.Simple.Util (findDuplicate, firstJust)
+import Util (findDuplicate, firstJust)
 import Prelude hiding (head)
 
 type X = TypeClassTypeFamily

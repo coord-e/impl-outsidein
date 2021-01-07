@@ -38,9 +38,9 @@ import Language.Simple.Type.Error (TypeError (..))
 import Language.Simple.Type.Generator (generateConstraint)
 import Language.Simple.Type.Solver (solveConstraint)
 import Language.Simple.Type.Substitution (Substitutable (..))
-import Language.Simple.Util (logDocInfo)
 import Numeric (showIntAtBase)
 import Prettyprinter (Pretty (..), nest, (<+>))
+import Util (logDocInfo)
 
 typeProgram ::
   forall x m.

@@ -51,10 +51,10 @@ import Language.Simple.Type.Env (HasProgramEnv (..))
 import Language.Simple.Type.Error (TypeError (..))
 import Language.Simple.Type.Substitution (Subst (..), Substitutable (..))
 import qualified Language.Simple.Type.Substitution as Subst (compose, empty, null)
-import Language.Simple.Util (findDuplicate, foldMapM)
 import Prettyprinter (Pretty (..), hsep, squotes, (<+>))
 import Prettyprinter.Internal (unsafeTextWithoutNewlines)
 import Text.Parser.Token (TokenParsing)
+import Util (findDuplicate, foldMapM)
 import Prelude hiding (head)
 
 data TypeClass

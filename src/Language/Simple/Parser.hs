@@ -61,7 +61,6 @@ import Language.Simple.Syntax
     TypeVar (..),
     functionType,
   )
-import Language.Simple.Util (orEmpty)
 import Lens.Micro (_1, _2, _3, _4)
 import Lens.Micro.Mtl ((%=))
 import Prettyprinter (Pretty (..), (<+>))
@@ -80,6 +79,7 @@ import Text.Parser.Token
     whiteSpace,
   )
 import Text.Parser.Token.Style (buildSomeSpaceParser, scalaCommentStyle)
+import Util (orEmpty)
 
 data ParseError = ParseFailed !String
   deriving (Show)

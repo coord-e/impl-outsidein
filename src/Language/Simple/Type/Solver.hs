@@ -19,8 +19,8 @@ import Language.Simple.Type.Constraint (GeneratedConstraint (..), UniVar, implic
 import Language.Simple.Type.Env (HasProgramEnv)
 import Language.Simple.Type.Error (TypeError (..))
 import Language.Simple.Type.Substitution (Substitutable (..), Unifier)
-import Language.Simple.Util (logParamsDebug)
 import Prettyprinter (Pretty (..))
+import Util (logParamsDebug)
 
 solveConstraint ::
   ( ConstraintDomain x,

@@ -31,8 +31,8 @@ import Language.Simple.Syntax (Constraint (..), Monotype (..), TypeVar)
 import Language.Simple.Type.Constraint (UniVar)
 import Language.Simple.Type.Substitution (Subst (..), Substitutable (..))
 import qualified Language.Simple.Type.Substitution as Subst (empty, merge, singleton)
-import Language.Simple.Util (fromJustOr)
 import Prettyprinter (Pretty (..))
+import Util (fromJustOr)
 
 data Tv
   = UniTv UniVar

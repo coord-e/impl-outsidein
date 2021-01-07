@@ -31,6 +31,7 @@ library
 
     hs-source-dirs:   src
     other-modules:
+        Util
         Language.Simple.ConstraintDomain.TypeClassTypeFamily.Canonicalize
         Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension
         Language.Simple.ConstraintDomain.TypeClassTypeFamily.Interact
@@ -47,7 +48,6 @@ library
         Language.Simple.Type.Program
         Language.Simple.Type.Solver
         Language.Simple.Type.Substitution
-        Language.Simple.Util
 
     default-language: Haskell2010
     ghc-options:

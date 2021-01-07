@@ -31,8 +31,8 @@ import Language.Simple.Type.Env (HasProgramEnv)
 import Language.Simple.Type.Error (TypeError)
 import Language.Simple.Type.Substitution (Subst, substitute)
 import qualified Language.Simple.Type.Substitution as Subst (compose, domain, empty, limit, singleton)
-import Language.Simple.Util (logParamsDebug)
 import Prettyprinter (Pretty (..), encloseSep)
+import Util (logParamsDebug)
 import Prelude hiding (interact)
 
 type X = TypeClassTypeFamily

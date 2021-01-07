@@ -42,7 +42,7 @@ import Language.Simple.Type.Env (HasLocalTypeEnv (..), HasProgramEnv (..), HasTy
 import Language.Simple.Type.Error (TypeError (..))
 import Language.Simple.Type.Substitution (Instantiator, Subst (..))
 import qualified Language.Simple.Type.Substitution as Subst (replaceAll)
-import Language.Simple.Util (foldMapM, orThrowM)
+import Util (foldMapM, orThrowM)
 
 generateConstraint ::
   ( ConstraintDomain x,
