@@ -28,10 +28,15 @@ library
         Language.Simple.Parser
         Language.Simple.Syntax
         Language.Simple.Type
+        Language.Core
+        Language.Core.Syntax
+        Language.Core.Type
 
     hs-source-dirs:   src
     other-modules:
         Util
+        Language.Core.Type.Env
+        Language.Core.Type.Error
         Language.Simple.ConstraintDomain.TypeClassTypeFamily.Canonicalize
         Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension
         Language.Simple.ConstraintDomain.TypeClassTypeFamily.Interact
