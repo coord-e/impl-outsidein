@@ -6,10 +6,10 @@ import GHC.Generics (Generic)
 import Language.Core.Syntax
   ( AxiomName,
     CoercionVar,
+    CompleteProposition,
+    CompleteType,
     DataCtor,
-    Proposition,
     TermVar,
-    Type,
     TypeCtor,
     TypeVar,
   )
@@ -20,14 +20,14 @@ data TypeError
   | UnboundTypeVar TypeVar
   | UnboundCoercionVar CoercionVar
   | UnboundAxiomName AxiomName
-  | FunctionTypeExpected Type
-  | ApplyTypeExpected Type
-  | ForallTypeExpected Type
-  | CoercionForallTypeExpected Type
-  | TypeMismatch Type Type
+  | FunctionTypeExpected CompleteType
+  | ApplyTypeExpected CompleteType
+  | ForallTypeExpected CompleteType
+  | CoercionForallTypeExpected CompleteType
+  | TypeMismatch CompleteType CompleteType
   | TypeCtorMismatch TypeCtor TypeCtor
   | LengthMismatch Int Int
-  | PropositionMismatch Proposition Proposition
+  | PropositionMismatch CompleteProposition CompleteProposition
   | DuplicateTypeVar TypeVar
   | DuplicateCoercionVar CoercionVar
   deriving (Generic)

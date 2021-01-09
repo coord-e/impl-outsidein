@@ -28,27 +28,29 @@ import Language.Core.Syntax
     AxiomScheme,
     CoercionVar,
     CoercionVarBinder (..),
+    CompleteCoercionVarBinder,
+    CompleteProposition,
+    CompleteTermVarBinder,
+    CompleteType,
     DataCtor,
     DataCtorType,
-    Proposition,
     TermVar,
     TermVarBinder (..),
-    Type,
     TypeVar,
   )
 
 data Env = Env
   { axioms :: HashMap AxiomName AxiomScheme,
-    vars :: HashMap TermVar Type,
+    vars :: HashMap TermVar CompleteType,
     dataCtors :: HashMap DataCtor DataCtorType,
-    coercionVars :: HashMap CoercionVar Proposition,
+    coercionVars :: HashMap CoercionVar CompleteProposition,
     typeVars :: HashSet TypeVar
   }
 
 newtype EnvT m a = MkEnvT (ReaderT Env m a)
   deriving newtype (Functor, Applicative, Monad, MonadError e)
 
-withTermVar :: Monad m => TermVarBinder -> EnvT m a -> EnvT m a
+withTermVar :: Monad m => CompleteTermVarBinder -> EnvT m a -> EnvT m a
 withTermVar (TermVarBinder x t) (MkEnvT a) = MkEnvT $ local f a
   where
     f e@Env {vars} = e {vars = HashMap.insert x t vars}
@@ -58,12 +60,12 @@ withTypeVar v (MkEnvT a) = MkEnvT $ local f a
   where
     f e@Env {typeVars} = e {typeVars = HashSet.insert v typeVars}
 
-withCoercionVar :: Monad m => CoercionVarBinder -> EnvT m a -> EnvT m a
+withCoercionVar :: Monad m => CompleteCoercionVarBinder -> EnvT m a -> EnvT m a
 withCoercionVar (CoercionVarBinder v p) (MkEnvT a) = MkEnvT $ local f a
   where
     f e@Env {coercionVars} = e {coercionVars = HashMap.insert v p coercionVars}
 
-lookupTermVar :: Monad m => TermVar -> EnvT m (Maybe Type)
+lookupTermVar :: Monad m => TermVar -> EnvT m (Maybe CompleteType)
 lookupTermVar x = MkEnvT . asks $ HashMap.lookup x . vars
 
 lookupDataCtor :: Monad m => DataCtor -> EnvT m (Maybe DataCtorType)
@@ -75,13 +77,13 @@ lookupAxiomScheme n = MkEnvT . asks $ HashMap.lookup n . axioms
 lookupTypeVar :: Monad m => TypeVar -> EnvT m Bool
 lookupTypeVar v = MkEnvT . asks $ HashSet.member v . typeVars
 
-lookupCoercionVar :: Monad m => CoercionVar -> EnvT m (Maybe Proposition)
+lookupCoercionVar :: Monad m => CoercionVar -> EnvT m (Maybe CompleteProposition)
 lookupCoercionVar v = MkEnvT . asks $ HashMap.lookup v . coercionVars
 
 runEnvT ::
   Monad m =>
   HashMap AxiomName AxiomScheme ->
-  HashMap TermVar Type ->
+  HashMap TermVar CompleteType ->
   HashMap DataCtor DataCtorType ->
   EnvT m a ->
   m a

@@ -21,6 +21,12 @@ import Language.Core.Syntax
     Coercion (..),
     CoercionVar,
     CoercionVarBinder (..),
+    CompleteCoercion,
+    CompleteCoercionVarBinder,
+    CompleteExpr,
+    CompleteProposition,
+    CompleteTermVarBinder,
+    CompleteType,
     DataCtor,
     DataCtorType (..),
     Expr (..),
@@ -31,6 +37,8 @@ import Language.Core.Syntax
     Type (..),
     TypeCtor,
     TypeVar,
+    takePropositionLhs,
+    takePropositionRhs,
     pattern FunctionType,
   )
 import Language.Core.Type.Env
@@ -81,7 +89,7 @@ checkDataCtor DataCtorType {universalVars, existentialVars, fields, ctor, ctorAr
 checkBinding :: MonadError TypeError m => Binding -> EnvT m ()
 checkBinding (Binding b e) = void . withTermVar b $ typeExpr e
 
-typeExpr :: MonadError TypeError m => Expr -> EnvT m Type
+typeExpr :: MonadError TypeError m => CompleteExpr -> EnvT m CompleteType
 typeExpr (CtorExpr k) = do
   DataCtorType
     { universalVars,
@@ -171,7 +179,7 @@ typeExpr (CastExpr e c) = do
   assertTypeMatch t t1
   pure t2
 
-coercionProposition :: MonadError TypeError m => Coercion -> EnvT m Proposition
+coercionProposition :: MonadError TypeError m => CompleteCoercion -> EnvT m CompleteProposition
 coercionProposition (AxiomCoercion n tys) = do
   ForallAxiomScheme {vars, lhs, rhs} <- findAxiomScheme n
   assertLengthMatch vars tys
@@ -180,13 +188,13 @@ coercionProposition (AxiomCoercion n tys) = do
 coercionProposition (VarCoercion v) = findCoercionVar v
 coercionProposition (TypeCtorCoercion k cs) = do
   ps <- traverse coercionProposition cs
-  let lhs = ApplyType k (fmap takeLhs ps)
-  let rhs = ApplyType k (fmap takeRhs ps)
+  let lhs = ApplyType k (fmap takePropositionLhs ps)
+  let rhs = ApplyType k (fmap takePropositionRhs ps)
   pure $ Proposition lhs rhs
 coercionProposition (FamilyCoercion k cs) = do
   ps <- traverse coercionProposition cs
-  let lhs = FamilyApplyType k (fmap takeLhs ps)
-  let rhs = FamilyApplyType k (fmap takeRhs ps)
+  let lhs = FamilyApplyType k (fmap takePropositionLhs ps)
+  let rhs = FamilyApplyType k (fmap takePropositionRhs ps)
   pure $ Proposition lhs rhs
 coercionProposition (ReflCoercion t) = checkType t $> Proposition t t
 coercionProposition (TransCoercion c1 c2) = do
@@ -203,18 +211,14 @@ coercionProposition (EquivalentCoercion c1 c2) = do
   assertPropositionMatch p1 p2
   pure p1
 
-takeLhs, takeRhs :: Proposition -> Type
-takeLhs (Proposition lhs _) = lhs
-takeRhs (Proposition _ rhs) = rhs
-
-checkType :: MonadError TypeError m => Type -> EnvT m ()
+checkType :: MonadError TypeError m => CompleteType -> EnvT m ()
 checkType (VarType v) = findTypeVar v
 checkType (ApplyType _ ts) = traverse_ checkType ts
 checkType (FamilyApplyType _ ts) = traverse_ checkType ts
 checkType (ForallType v t) = withTypeVar v $ checkType t
 checkType (CoercionForallType _ t) = checkType t
 
-assertTypeMatch :: MonadError TypeError m => Type -> Type -> m ()
+assertTypeMatch :: MonadError TypeError m => CompleteType -> CompleteType -> m ()
 assertTypeMatch = assertEq TypeMismatch
 
 assertDistinctTypeVar :: MonadError TypeError m => Vector TypeVar -> m ()
@@ -228,7 +232,7 @@ assertLengthMatch (Vector.length -> l1) (Vector.length -> l2)
 assertTypeCtorMatch :: MonadError TypeError m => TypeCtor -> TypeCtor -> m ()
 assertTypeCtorMatch = assertEq TypeCtorMismatch
 
-assertPropositionMatch :: MonadError TypeError m => Proposition -> Proposition -> m ()
+assertPropositionMatch :: MonadError TypeError m => CompleteProposition -> CompleteProposition -> m ()
 assertPropositionMatch = assertEq PropositionMismatch
 
 assertDistinct :: (Eq a, Hashable a, MonadError TypeError m) => (a -> TypeError) -> Vector a -> m ()
@@ -241,26 +245,26 @@ assertEq p x1 x2
   | x1 == x2 = pure ()
   | otherwise = throwError (p x1 x2)
 
-assertApplyType :: MonadError TypeError m => Type -> m (TypeCtor, Vector Type)
+assertApplyType :: MonadError TypeError m => CompleteType -> m (TypeCtor, Vector CompleteType)
 assertApplyType (ApplyType k ts) = pure (k, ts)
 assertApplyType t = throwError $ ApplyTypeExpected t
 
-assertCoercionForallType :: MonadError TypeError m => Type -> m (Proposition, Type)
+assertCoercionForallType :: MonadError TypeError m => CompleteType -> m (CompleteProposition, CompleteType)
 assertCoercionForallType (CoercionForallType p t) = pure (p, t)
 assertCoercionForallType t = throwError $ CoercionForallTypeExpected t
 
-assertForallType :: MonadError TypeError m => Type -> m (TypeVar, Type)
+assertForallType :: MonadError TypeError m => CompleteType -> m (TypeVar, CompleteType)
 assertForallType (ForallType v t) = pure (v, t)
 assertForallType t = throwError $ ForallTypeExpected t
 
-assertFunctionType :: MonadError TypeError m => Type -> m (Type, Type)
+assertFunctionType :: MonadError TypeError m => CompleteType -> m (CompleteType, CompleteType)
 assertFunctionType (FunctionType t1 t2) = pure (t1, t2)
 assertFunctionType t = throwError $ FunctionTypeExpected t
 
-withTermVars :: (Monad m, Foldable f) => f TermVarBinder -> EnvT m a -> EnvT m a
+withTermVars :: (Monad m, Foldable f) => f CompleteTermVarBinder -> EnvT m a -> EnvT m a
 withTermVars t a = foldr withTermVar a t
 
-withCoercionVars :: (Monad m, Foldable f) => f CoercionVarBinder -> EnvT m a -> EnvT m a
+withCoercionVars :: (Monad m, Foldable f) => f CompleteCoercionVarBinder -> EnvT m a -> EnvT m a
 withCoercionVars t a = foldr withCoercionVar a t
 
 withTypeVars :: (Monad m, Foldable f) => f TypeVar -> EnvT m a -> EnvT m a
@@ -269,7 +273,7 @@ withTypeVars t a = foldr withTypeVar a t
 findDataCtor :: MonadError TypeError m => DataCtor -> EnvT m DataCtorType
 findDataCtor k = lookupDataCtor k `orThrowM` UnboundDataCtor k
 
-findTermVar :: MonadError TypeError m => TermVar -> EnvT m Type
+findTermVar :: MonadError TypeError m => TermVar -> EnvT m CompleteType
 findTermVar x = lookupTermVar x `orThrowM` UnboundTermVar x
 
 findTypeVar :: MonadError TypeError m => TypeVar -> EnvT m ()
@@ -280,5 +284,5 @@ findTypeVar x = do
 findAxiomScheme :: MonadError TypeError m => AxiomName -> EnvT m AxiomScheme
 findAxiomScheme x = lookupAxiomScheme x `orThrowM` UnboundAxiomName x
 
-findCoercionVar :: MonadError TypeError m => CoercionVar -> EnvT m Proposition
+findCoercionVar :: MonadError TypeError m => CoercionVar -> EnvT m CompleteProposition
 findCoercionVar x = lookupCoercionVar x `orThrowM` UnboundCoercionVar x

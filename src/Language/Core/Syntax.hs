@@ -12,6 +12,15 @@
 module Language.Core.Syntax
   ( Program (..),
     Binding (..),
+    CompleteType,
+    CompleteTermVarBinder,
+    CompleteExpr,
+    takePropositionLhs,
+    takePropositionRhs,
+    CompleteProposition,
+    CompleteCaseArm,
+    CompleteCoercion,
+    CompleteCoercionVarBinder,
     AxiomName (..),
     AxiomScheme (..),
     DataCtorType (..),
@@ -38,6 +47,7 @@ import Data.Hashable (Hashable)
 import Data.Text (Text)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (fromList, null, toList)
+import Data.Void (Void)
 import GHC.Generics (Generic)
 import Language.Simple.Syntax
   ( Class (..),
@@ -52,12 +62,12 @@ import Prettyprinter.Internal (unsafeTextWithoutNewlines)
 data Program = Program
   { bindings :: Vector Binding,
     axioms :: HashMap AxiomName AxiomScheme,
-    vars :: HashMap TermVar Type,
+    vars :: HashMap TermVar CompleteType,
     dataCtors :: HashMap DataCtor DataCtorType
   }
   deriving (Generic, Show, Eq)
 
-data Binding = Binding TermVarBinder Expr
+data Binding = Binding CompleteTermVarBinder CompleteExpr
   deriving (Generic, Show, Eq)
 
 instance Pretty Binding where
@@ -65,8 +75,8 @@ instance Pretty Binding where
 
 data AxiomScheme = ForallAxiomScheme
   { vars :: Vector TypeVar,
-    lhs :: Type,
-    rhs :: Type
+    lhs :: CompleteType,
+    rhs :: CompleteType
   }
   deriving (Generic, Show, Eq)
 
@@ -80,8 +90,8 @@ instance Pretty AxiomScheme where
 data DataCtorType = DataCtorType
   { universalVars :: Vector TypeVar,
     existentialVars :: Vector TypeVar,
-    coercionVars :: Vector Proposition,
-    fields :: Vector Type,
+    coercionVars :: Vector CompleteProposition,
+    fields :: Vector CompleteType,
     ctor :: TypeCtor,
     ctorArgs :: Vector TypeVar
   }
@@ -97,21 +107,25 @@ instance Pretty DataCtorType where
         pretty ctor <+> hsep (map pretty $ Vector.toList ctorArgs)
       ]
 
-data Expr
-  = CtorExpr DataCtor
+data Expr a c d
+  = UnsolvedClassDictionaryExpr d
+  | CtorExpr DataCtor
   | VarExpr TermVar
-  | LambdaExpr TermVarBinder Expr
-  | TypeLambdaExpr TypeVar Expr
-  | CoercionLambdaExpr CoercionVarBinder Expr
-  | ApplyExpr Expr Expr
-  | TypeApplyExpr Expr Type
-  | CoercionApplyExpr Expr Coercion
-  | CaseExpr Expr Type (Vector CaseArm)
-  | LetExpr TermVarBinder Expr Expr
-  | CastExpr Expr Coercion
+  | LambdaExpr (TermVarBinder a) (Expr a c d)
+  | TypeLambdaExpr TypeVar (Expr a c d)
+  | CoercionLambdaExpr (CoercionVarBinder a) (Expr a c d)
+  | ApplyExpr (Expr a c d) (Expr a c d)
+  | TypeApplyExpr (Expr a c d) (Type a)
+  | CoercionApplyExpr (Expr a c d) (Coercion a c)
+  | CaseExpr (Expr a c d) (Type a) (Vector (CaseArm a c d))
+  | LetExpr (TermVarBinder a) (Expr a c d) (Expr a c d)
+  | CastExpr (Expr a c d) (Coercion a c)
   deriving (Generic, Show, Eq)
 
-instance Pretty Expr where
+type CompleteExpr = Expr Void Void Void
+
+instance (Pretty a, Pretty c, Pretty d) => Pretty (Expr a c d) where
+  pretty (UnsolvedClassDictionaryExpr d) = pretty d
   pretty (CtorExpr k) = pretty k
   pretty (VarExpr x) = pretty x
   pretty (LambdaExpr b e) = "λ" <> pretty b <> "." <+> pretty e
@@ -127,24 +141,26 @@ instance Pretty Expr where
   pretty (LetExpr b e1 e2) = "let" <+> pretty b <+> "=" <+> pretty e1 <+> "in" <+> pretty e2
   pretty (CastExpr e c) = pretty e <+> "▹" <+> pretty c
 
-prettyAtomExpr :: Expr -> Doc ann
+prettyAtomExpr :: (Pretty a, Pretty c, Pretty d) => Expr a c d -> Doc ann
 prettyAtomExpr e@ApplyExpr {} = parens (pretty e)
 prettyAtomExpr e@TypeApplyExpr {} = parens (pretty e)
 prettyAtomExpr e@CoercionApplyExpr {} = parens (pretty e)
 prettyAtomExpr e@CastExpr {} = parens (pretty e)
 prettyAtomExpr e = pretty e
 
-data CaseArm = CaseArm
+data CaseArm a c d = CaseArm
   { ctor :: DataCtor,
-    typeArgs :: Vector Type,
+    typeArgs :: Vector (Type a),
     existentialVars :: Vector TypeVar,
-    coercionVars :: Vector CoercionVarBinder,
-    termVars :: Vector TermVarBinder,
-    body :: Expr
+    coercionVars :: Vector (CoercionVarBinder a),
+    termVars :: Vector (TermVarBinder a),
+    body :: Expr a c d
   }
   deriving (Generic, Show, Eq)
 
-instance Pretty CaseArm where
+type CompleteCaseArm = CaseArm Void Void Void
+
+instance (Pretty a, Pretty c, Pretty d) => Pretty (CaseArm a c d) where
   pretty CaseArm {ctor, typeArgs, existentialVars, coercionVars, termVars, body} =
     hsep
       [ pretty ctor,
@@ -156,16 +172,20 @@ instance Pretty CaseArm where
         pretty body
       ]
 
-data TermVarBinder = TermVarBinder TermVar Type
+data TermVarBinder a = TermVarBinder TermVar (Type a)
   deriving (Generic, Show, Eq)
 
-instance Pretty TermVarBinder where
+type CompleteTermVarBinder = TermVarBinder Void
+
+instance Pretty a => Pretty (TermVarBinder a) where
   pretty (TermVarBinder v t) = pretty v <+> "::" <+> pretty t
 
-data CoercionVarBinder = CoercionVarBinder CoercionVar Proposition
+data CoercionVarBinder a = CoercionVarBinder CoercionVar (Proposition a)
   deriving (Generic, Show, Eq)
 
-instance Pretty CoercionVarBinder where
+type CompleteCoercionVarBinder = CoercionVarBinder Void
+
+instance Pretty a => Pretty (CoercionVarBinder a) where
   pretty (CoercionVarBinder v p) = pretty v <+> "::" <+> pretty p
 
 data TypeCtor
@@ -180,21 +200,25 @@ instance Pretty TypeCtor where
   pretty (ClassDictionaryTypeCtor k) = "{" <> pretty k <> "}"
   pretty FunctionTypeCtor = "(->)"
 
-data Type
-  = VarType TypeVar
-  | ApplyType TypeCtor (Vector Type)
-  | FamilyApplyType Family (Vector Type)
-  | ForallType TypeVar Type
-  | CoercionForallType Proposition Type
+data Type a
+  = UniType a
+  | VarType TypeVar
+  | ApplyType TypeCtor (Vector (Type a))
+  | FamilyApplyType Family (Vector (Type a))
+  | ForallType TypeVar (Type a)
+  | CoercionForallType (Proposition a) (Type a)
   deriving (Generic, Show, Eq)
 
-pattern FunctionType :: Type -> Type -> Type
+type CompleteType = Type Void
+
+pattern FunctionType :: Type a -> Type a -> Type a
 pattern FunctionType a b <-
   ApplyType FunctionTypeCtor (Vector.toList -> [a, b])
   where
     FunctionType a b = ApplyType FunctionTypeCtor $ Vector.fromList [a, b]
 
-instance Pretty Type where
+instance Pretty a => Pretty (Type a) where
+  pretty (UniType a) = pretty a
   pretty (VarType v) = pretty v
   pretty (FunctionType t1 t2)
     | isNested t1 = parens (pretty t1) <+> "->" <+> pretty t2
@@ -207,7 +231,8 @@ instance Pretty Type where
   pretty (ForallType v t) = "∀" <> pretty v <> "." <+> pretty t
   pretty (CoercionForallType p t) = "∀" <> parens (pretty p) <> "." <+> pretty t
 
-prettyAtomType :: Type -> Doc ann
+prettyAtomType :: Pretty a => Type a -> Doc ann
+prettyAtomType v@UniType {} = pretty v
 prettyAtomType v@VarType {} = pretty v
 prettyAtomType v@FamilyApplyType {} = pretty v
 prettyAtomType v@(ApplyType _ ts) | Vector.null ts = pretty v
@@ -229,24 +254,34 @@ newtype CoercionVar = CoercionVar Text
 instance Pretty CoercionVar where
   pretty (CoercionVar v) = unsafeTextWithoutNewlines v
 
-data Proposition = Proposition Type Type
+data Proposition a = Proposition (Type a) (Type a)
   deriving (Generic, Show, Eq)
 
-instance Pretty Proposition where
+type CompleteProposition = Proposition Void
+
+takePropositionLhs, takePropositionRhs :: Proposition a -> Type a
+takePropositionLhs (Proposition lhs _) = lhs
+takePropositionRhs (Proposition _ rhs) = rhs
+
+instance Pretty a => Pretty (Proposition a) where
   pretty (Proposition t1 t2) = pretty t1 <+> "~" <+> pretty t2
 
-data Coercion
-  = AxiomCoercion AxiomName (Vector Type)
+data Coercion a c
+  = UnsolvedCoercion c
+  | AxiomCoercion AxiomName (Vector (Type a))
   | VarCoercion CoercionVar
-  | TypeCtorCoercion TypeCtor (Vector Coercion)
-  | FamilyCoercion Family (Vector Coercion)
-  | ReflCoercion Type
-  | TransCoercion Coercion Coercion
-  | SymmCoercion Coercion
-  | EquivalentCoercion Coercion Coercion
+  | TypeCtorCoercion TypeCtor (Vector (Coercion a c))
+  | FamilyCoercion Family (Vector (Coercion a c))
+  | ReflCoercion (Type a)
+  | TransCoercion (Coercion a c) (Coercion a c)
+  | SymmCoercion (Coercion a c)
+  | EquivalentCoercion (Coercion a c) (Coercion a c)
   deriving (Generic, Show, Eq)
 
-instance Pretty Coercion where
+type CompleteCoercion = Coercion Void Void
+
+instance (Pretty a, Pretty c) => Pretty (Coercion a c) where
+  pretty (UnsolvedCoercion c) = pretty c
   pretty (AxiomCoercion n tys) = hsep (pretty n : map (("@" <>) . prettyAtomType) (Vector.toList tys))
   pretty (VarCoercion v) = pretty v
   pretty (TypeCtorCoercion k cs) = hsep (pretty k : map prettyAtomCoercion (Vector.toList cs))
@@ -256,7 +291,8 @@ instance Pretty Coercion where
   pretty (SymmCoercion c) = "sym" <+> prettyAtomCoercion c
   pretty (EquivalentCoercion c1 c2) = prettyAtomCoercion c1 <+> ", " <+> prettyAtomCoercion c2
 
-prettyAtomCoercion :: Coercion -> Doc ann
+prettyAtomCoercion :: (Pretty a, Pretty c) => Coercion a c -> Doc ann
+prettyAtomCoercion c@UnsolvedCoercion {} = pretty c
 prettyAtomCoercion c@VarCoercion {} = pretty c
 prettyAtomCoercion c@FamilyCoercion {} = pretty c
 prettyAtomCoercion c@ReflCoercion {} = pretty c
