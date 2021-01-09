@@ -160,7 +160,7 @@ step Quadruple {tch, flatten, given, wanted} =
     topw q1 others = do
       TopReactOutput {tch = tch', output} <- topReactWanted q1
       logParamsDebug
-        "TOPG"
+        "TOPW"
         [ ("Q1", pretty q1),
           ("tch (out)", pretty (HashSet.toList tch')),
           ("Q2 (out)", pretty output)
