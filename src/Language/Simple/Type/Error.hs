@@ -4,11 +4,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 module Language.Simple.Type.Error
   ( TypeError (..),
-    ExtensionTypeError,
   )
 where
 
@@ -16,17 +14,14 @@ import GHC.Generics (Generic)
 import Language.Simple.Syntax
   ( Constraint (..),
     DataCtor,
-    ExtensionConstraint,
-    ExtensionMonotype,
+    Monotype,
     TermVar,
     TypeVar,
   )
 import Language.Simple.Type.Constraint (UniVar)
 import Prettyprinter (Pretty (..), dquotes, nest, sep, (<+>))
 
-data family ExtensionTypeError x
-
-data TypeError x
+data TypeError
   = UnboundTermVar TermVar
   | UnboundTypeVar TypeVar
   | UnboundDataCtor DataCtor
@@ -36,17 +31,13 @@ data TypeError x
         expected :: Int,
         got :: Int
       }
-  | UnresolvedConstraint (Constraint x UniVar)
-  | ExtensionTypeError (ExtensionTypeError x)
+  | UnresolvedConstraint (Constraint UniVar)
+  | MatchingGivenConstraint (Constraint UniVar)
+  | OccurCheckError (Monotype UniVar) (Monotype UniVar)
+  | MismatchedTypes (Monotype UniVar) (Monotype UniVar)
   deriving (Generic)
 
-instance
-  ( Pretty (ExtensionMonotype x UniVar),
-    Pretty (ExtensionConstraint x UniVar),
-    Pretty (ExtensionTypeError x)
-  ) =>
-  Pretty (TypeError x)
-  where
+instance Pretty TypeError where
   pretty (UnboundTermVar x) = "unbound variable:" <+> pretty x
   pretty (UnboundTypeVar a) = "unbound type variable:" <+> pretty a
   pretty (UnboundDataCtor k) = "unbound data constructor:" <+> pretty k
@@ -62,4 +53,10 @@ instance
             <+> pretty got
         ]
   pretty (UnresolvedConstraint q) = "unresolved constraint:" <+> pretty q
-  pretty (ExtensionTypeError x) = pretty x
+  pretty (MatchingGivenConstraint q) = "the constraint" <+> pretty q <+> "matches an instance declaration"
+  pretty (OccurCheckError t1 t2) = "occur check failed:" <+> pretty t1 <+> "~" <+> pretty t2
+  pretty (MismatchedTypes t1 t2) =
+    "could not match expected type"
+      <+> dquotes (pretty t1)
+      <+> "with actual type"
+      <+> dquotes (pretty t2)

@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -42,62 +42,62 @@ import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet (toMap)
 import Data.Hashable (Hashable)
 import Language.Simple.Fresh (Fresh (..))
-import Language.Simple.Syntax (Constraint (..), ExtensionConstraint, ExtensionMonotype, Monotype (..), TypeVar)
+import Language.Simple.Syntax (Constraint (..), Monotype (..), TypeVar)
 import Language.Simple.Type.Constraint (GeneratedConstraint (..), UniVar)
 import Language.Simple.Type.Error (TypeError (..))
 import Prettyprinter (Pretty (..), list, (<+>))
 import Util (fromJustOr, orThrow)
 import Prelude hiding (lookup, null)
 
-newtype Subst x a = Subst (HashMap a (Monotype x UniVar))
+newtype Subst a = Subst (HashMap a (Monotype UniVar))
 
-type Unifier x = Subst x UniVar
+type Unifier = Subst UniVar
 
-type Instantiator x = Subst x TypeVar
+type Instantiator = Subst TypeVar
 
-instance (Pretty (ExtensionMonotype x UniVar), Pretty a) => Pretty (Subst x a) where
+instance Pretty a => Pretty (Subst a) where
   pretty (Subst m) = list . map f $ HashMap.toList m
     where
       f (k, v) = pretty k <+> "↦" <+> pretty v
 
-empty :: Subst x a
+empty :: Subst a
 empty = Subst HashMap.empty
 
-null :: Subst x a -> Bool
+null :: Subst a -> Bool
 null (Subst m) = HashMap.null m
 
-member :: (Hashable a, Eq a) => a -> Subst x a -> Bool
+member :: (Hashable a, Eq a) => a -> Subst a -> Bool
 member k (Subst m) = HashMap.member k m
 
-lookup :: (Hashable a, Eq a) => a -> Subst x a -> Maybe (Monotype x UniVar)
+lookup :: (Hashable a, Eq a) => a -> Subst a -> Maybe (Monotype UniVar)
 lookup k (Subst m) = HashMap.lookup k m
 
-domain :: Subst x a -> HashSet a
+domain :: Subst a -> HashSet a
 domain (Subst m) = HashMap.keysSet m
 
-limit :: (Hashable a, Eq a) => HashSet a -> Subst x a -> Subst x a
+limit :: (Hashable a, Eq a) => HashSet a -> Subst a -> Subst a
 limit s (Subst m) = Subst . HashMap.intersection m $ HashSet.toMap s
 
-singleton :: Hashable a => a -> Monotype x UniVar -> Subst x a
+singleton :: Hashable a => a -> Monotype UniVar -> Subst a
 singleton k v = Subst $ HashMap.singleton k v
 
 compose ::
   ( Eq a,
     Hashable a,
-    Substitutable x a (Monotype x UniVar)
+    Substitutable a (Monotype UniVar)
   ) =>
-  Subst x a ->
-  Subst x a ->
-  Subst x a
+  Subst a ->
+  Subst a ->
+  Subst a
 compose (Subst m1) (Subst m2) = Subst $ HashMap.union (fmap (substitute (Subst m1)) m2) m1
 
 merge ::
   (Eq a, Hashable a, MonadFail m) =>
-  (a -> Monotype x UniVar) ->
-  (Monotype x UniVar -> Monotype x UniVar -> Bool) ->
-  Subst x a ->
-  Subst x a ->
-  m (Subst x a)
+  (a -> Monotype UniVar) ->
+  (Monotype UniVar -> Monotype UniVar -> Bool) ->
+  Subst a ->
+  Subst a ->
+  m (Subst a)
 merge c p (Subst m1) (Subst m2)
   | agree = pure . Subst $ HashMap.union m1 m2
   | otherwise = fail "Subst.merge"
@@ -105,43 +105,38 @@ merge c p (Subst m1) (Subst m2)
     agree = all check (HashMap.keysSet (m1 `HashMap.intersection` m2))
     check v = p (HashMap.lookup v m1 `fromJustOr` c v) (HashMap.lookup v m2 `fromJustOr` c v)
 
-replaceAll :: MonadError (TypeError x) m => Instantiator x -> TypeVar -> m (Monotype x UniVar)
+replaceAll :: MonadError TypeError m => Instantiator -> TypeVar -> m (Monotype UniVar)
 replaceAll m v = lookup v m `orThrow` UnboundTypeVar v
 
-fromBinders :: (Eq a, Hashable a, Fresh m, Foldable f) => f a -> m (Subst x a)
+fromBinders :: (Eq a, Hashable a, Fresh m, Foldable f) => f a -> m (Subst a)
 fromBinders = foldlM go empty
   where
     go (Subst subst) v = do
       a <- fresh
       pure . Subst $ HashMap.insert v (UniType a) subst
 
-class Substitutable x a b | a b -> x where
-  substitute :: Subst x a -> b -> b
+class Substitutable a b where
+  substitute :: Subst a -> b -> b
 
-instance Substitutable x UniVar (Constraint x UniVar) => Substitutable x UniVar (GeneratedConstraint x) where
+instance Substitutable UniVar GeneratedConstraint where
   substitute s (Constraint q) = Constraint (substitute s q)
   substitute s (ProductGeneratedConstraint c1 c2) = ProductGeneratedConstraint (substitute s c1) (substitute s c2)
   substitute s (ExistentialGeneratedConstraint vs p c) = ExistentialGeneratedConstraint vs (substitute s p) (substitute s c)
 
-instance
-  ( Substitutable x a (ExtensionConstraint x UniVar),
-    Substitutable x a (Monotype x UniVar)
-  ) =>
-  Substitutable x a (Constraint x UniVar)
-  where
+instance Substitutable a (Monotype UniVar) => Substitutable a (Constraint UniVar) where
   substitute _ EmptyConstraint = EmptyConstraint
   substitute s (ProductConstraint q1 q2) = ProductConstraint (substitute s q1) (substitute s q2)
   substitute s (EqualityConstraint t1 t2) = EqualityConstraint (substitute s t1) (substitute s t2)
-  substitute s (ExtensionConstraint x) = ExtensionConstraint $ substitute s x
+  substitute s (TypeClassConstraint k ts) = TypeClassConstraint k $ fmap (substitute s) ts
 
-instance Substitutable x UniVar (ExtensionMonotype x UniVar) => Substitutable x UniVar (Monotype x UniVar) where
+instance Substitutable UniVar (Monotype UniVar) where
   substitute _ (VarType v) = VarType v
   substitute (Subst s) (UniType u) = HashMap.lookup u s `fromJustOr` UniType u
   substitute s (ApplyType k ts) = ApplyType k $ fmap (substitute s) ts
-  substitute s (ExtensionType x) = ExtensionType $ substitute s x
+  substitute s (FamilyApplyType k ts) = FamilyApplyType k $ fmap (substitute s) ts
 
-instance Substitutable x TypeVar (ExtensionMonotype x UniVar) => Substitutable x TypeVar (Monotype x UniVar) where
+instance Substitutable TypeVar (Monotype UniVar) where
   substitute _ (UniType v) = UniType v
   substitute (Subst s) (VarType v) = HashMap.lookup v s `fromJustOr` VarType v
   substitute s (ApplyType k ts) = ApplyType k $ fmap (substitute s) ts
-  substitute s (ExtensionType x) = ExtensionType $ substitute s x
+  substitute s (FamilyApplyType k ts) = FamilyApplyType k $ fmap (substitute s) ts

@@ -4,7 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 
-module Language.Simple.ConstraintDomain.TypeClassTypeFamily.TopReact
+module Language.Simple.Type.Solver.TopReact
   ( topReactGiven,
     topReactWanted,
     TopReactOutput (..),
@@ -21,45 +21,41 @@ import qualified Data.HashSet as HashSet (member, singleton)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (filter)
 import Data.Void (Void, vacuous)
-import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension (ExtensionTypeError (..), TypeClassTypeFamily)
-import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax
-  ( AtomicConstraint (..),
-    ClassConstraint (..),
-    ConstraintLocation (..),
-    FamilyType (..),
-    fromAtomicConstraint,
-    pattern FamilyApplyType,
-    pattern FamilyFree,
-    pattern FamilyFreeSeq,
-    pattern TypeClassConstraint,
-  )
-import Language.Simple.ConstraintDomain.Util (Tv (..), matchTypes)
 import Language.Simple.Fresh (Fresh)
 import Language.Simple.Syntax (AxiomScheme (..), Constraint (..), Monotype (..), TypeVar)
 import Language.Simple.Type.Constraint (UniVar, fuv)
 import Language.Simple.Type.Env (HasProgramEnv (..))
 import Language.Simple.Type.Error (TypeError (..))
+import Language.Simple.Type.Solver.Syntax
+  ( AtomicConstraint (..),
+    ClassConstraint (..),
+    ConstraintLocation (..),
+    FamilyType (..),
+    Tv (..),
+    fromAtomicConstraint,
+    matchTypes,
+    pattern FamilyFree,
+    pattern FamilyFreeSeq,
+  )
 import Language.Simple.Type.Substitution (Subst (..), substitute)
 import qualified Language.Simple.Type.Substitution as Subst (fromBinders)
 import Util (findDuplicate, firstJust)
 import Prelude hiding (head)
 
-type X = TypeClassTypeFamily
-
 data TopReactOutput = TopReactOutput
   { tch :: HashSet UniVar,
-    output :: Constraint X UniVar
+    output :: Constraint UniVar
   }
 
-topReactGiven :: (HasProgramEnv X m, Fresh m, MonadError (TypeError X) m) => AtomicConstraint -> MaybeT m TopReactOutput
+topReactGiven :: (HasProgramEnv m, Fresh m, MonadError TypeError m) => AtomicConstraint -> MaybeT m TopReactOutput
 topReactGiven q = topReactFamily Given q `mplus` topReactClass Given q
 
-topReactWanted :: (HasProgramEnv X m, Fresh m, MonadError (TypeError X) m) => AtomicConstraint -> MaybeT m TopReactOutput
+topReactWanted :: (HasProgramEnv m, Fresh m, MonadError TypeError m) => AtomicConstraint -> MaybeT m TopReactOutput
 topReactWanted q = topReactFamily Wanted q `mplus` topReactClass Wanted q
 
 topReactClass ::
-  ( HasProgramEnv X m,
-    MonadError (TypeError X) m,
+  ( HasProgramEnv m,
+    MonadError TypeError m,
     Fresh m
   ) =>
   ConstraintLocation ->
@@ -68,7 +64,7 @@ topReactClass ::
 topReactClass l q@(ClassAtomicConstraint k (FamilyFreeSeq ts)) = do
   MatchingClassAxiom {onlyPredicateVars, predicate, subst = Subst subst} <- findMatchingClassAxiom (ClassConstraint k ts)
   case l of
-    Given -> throwError . ExtensionTypeError $ MatchingGivenConstraint (fromAtomicConstraint q)
+    Given -> throwError $ MatchingGivenConstraint (fromAtomicConstraint q)
     Wanted -> do
       Subst onlyPredicateSubst <- Subst.fromBinders $ fmap RigidTv onlyPredicateVars
       -- TODO: deal with raw subst manipulation
@@ -79,8 +75,8 @@ topReactClass l q@(ClassAtomicConstraint k (FamilyFreeSeq ts)) = do
 topReactClass _ _ = mzero
 
 topReactFamily ::
-  ( HasProgramEnv X m,
-    MonadError (TypeError X) m,
+  ( HasProgramEnv m,
+    MonadError TypeError m,
     Fresh m
   ) =>
   ConstraintLocation ->
@@ -100,13 +96,13 @@ topReactFamily _ _ = mzero
 
 data MatchingClassAxiom = MatchingClassAxiom
   { onlyPredicateVars :: Vector TypeVar,
-    predicate :: Constraint X Void,
-    subst :: Subst X Tv
+    predicate :: Constraint Void,
+    subst :: Subst Tv
   }
 
 findMatchingClassAxiom ::
-  ( HasProgramEnv X m,
-    MonadError (TypeError X) m
+  ( HasProgramEnv m,
+    MonadError TypeError m
   ) =>
   ClassConstraint UniVar ->
   MaybeT m MatchingClassAxiom
@@ -124,13 +120,13 @@ findMatchingClassAxiom cls = do
 
 data MatchingFamilyAxiom = MatchingFamilyAxiom
   { onlyRhsVars :: Vector TypeVar,
-    rhs :: Monotype X Void,
-    subst :: Subst X Tv
+    rhs :: Monotype Void,
+    subst :: Subst Tv
   }
 
 findMatchingFamilyAxiom ::
-  ( HasProgramEnv X m,
-    MonadError (TypeError X) m
+  ( HasProgramEnv m,
+    MonadError TypeError m
   ) =>
   FamilyType UniVar ->
   MaybeT m MatchingFamilyAxiom
@@ -151,17 +147,17 @@ findMatchingFamilyAxiom fam = do
           Just (vars, ts0, rhs, subst)
     go ForallAxiomScheme {} = Nothing
 
-frv :: Monotype X Void -> HashSet TypeVar
+frv :: Monotype Void -> HashSet TypeVar
 frv (VarType v) = HashSet.singleton v
 frv (ApplyType _ ts) = foldMap frv ts
 frv (FamilyApplyType _ ts) = foldMap frv ts
 
-matchClass :: ClassConstraint Void -> ClassConstraint UniVar -> Maybe (Subst X Tv)
+matchClass :: ClassConstraint Void -> ClassConstraint UniVar -> Maybe (Subst Tv)
 matchClass (ClassConstraint k1 ts1) (ClassConstraint k2 ts2)
   | k1 == k2 = matchTypes (fmap vacuous ts1) ts2
   | otherwise = Nothing
 
-matchFamily :: FamilyType Void -> FamilyType UniVar -> Maybe (Subst X Tv)
+matchFamily :: FamilyType Void -> FamilyType UniVar -> Maybe (Subst Tv)
 matchFamily (FamilyType k1 ts1) (FamilyType k2 ts2)
   | k1 == k2 = matchTypes (fmap vacuous ts1) ts2
   | otherwise = Nothing

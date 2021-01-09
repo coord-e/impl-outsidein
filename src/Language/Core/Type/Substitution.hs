@@ -26,7 +26,7 @@ substType (Subst m) (VarType v)
   | Just t <- HashMap.lookup v m = t
   | otherwise = VarType v
 substType s (ApplyType k ts) = ApplyType k (fmap (substType s) ts)
-substType s (FamilyType k ts) = FamilyType k (fmap (substType s) ts)
+substType s (FamilyApplyType k ts) = FamilyApplyType k (fmap (substType s) ts)
 substType (Subst m) (ForallType v t) = ForallType v (substType (Subst $ HashMap.delete v m) t)
 substType s (CoercionForallType b t) = CoercionForallType b (substType s t)
 

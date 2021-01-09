@@ -21,10 +21,6 @@ source-repository head
 library
     exposed-modules:
         Language.Simple
-        Language.Simple.ConstraintDomain
-        Language.Simple.ConstraintDomain.SimpleUnification
-        Language.Simple.ConstraintDomain.TypeClass
-        Language.Simple.ConstraintDomain.TypeClassTypeFamily
         Language.Simple.Parser
         Language.Simple.Syntax
         Language.Simple.Type
@@ -37,14 +33,11 @@ library
         Util
         Language.Core.Type.Env
         Language.Core.Type.Error
-        Language.Simple.ConstraintDomain.TypeClassTypeFamily.Canonicalize
-        Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension
-        Language.Simple.ConstraintDomain.TypeClassTypeFamily.Interact
-        Language.Simple.ConstraintDomain.TypeClassTypeFamily.Simplify
-        Language.Simple.ConstraintDomain.TypeClassTypeFamily.Solver
-        Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax
-        Language.Simple.ConstraintDomain.TypeClassTypeFamily.TopReact
-        Language.Simple.ConstraintDomain.Util
+        Language.Simple.Type.Solver.Canonicalize
+        Language.Simple.Type.Solver.Interact
+        Language.Simple.Type.Solver.Simplify
+        Language.Simple.Type.Solver.Syntax
+        Language.Simple.Type.Solver.TopReact
         Language.Simple.Fresh
         Language.Simple.Type.Constraint
         Language.Simple.Type.Env

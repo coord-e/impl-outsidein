@@ -4,7 +4,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 module Language.Simple.Type.Generator
   ( generateConstraint,
@@ -18,8 +17,7 @@ import Data.Foldable (foldlM)
 import qualified Data.HashMap.Strict as HashMap (insert, intersection, keys, member, union)
 import qualified Data.HashSet as HashSet (delete, difference, union)
 import qualified Data.Vector as Vector (length, zip)
-import Data.Void (vacuous)
-import Language.Simple.ConstraintDomain (ConstraintDomain, Instantiable (..))
+import Data.Void (Void, vacuous)
 import Language.Simple.Fresh (Fresh (..), GenFresh)
 import Language.Simple.Syntax
   ( CaseArm (..),
@@ -27,8 +25,6 @@ import Language.Simple.Syntax
     DataCtor,
     DataCtorType (..),
     Expr (..),
-    ExtensionConstraint,
-    ExtensionMonotype,
     Monotype (..),
     SimpleConstraint,
     SimpleMonotype,
@@ -45,16 +41,15 @@ import qualified Language.Simple.Type.Substitution as Subst (replaceAll)
 import Util (foldMapM, orThrowM)
 
 generateConstraint ::
-  ( ConstraintDomain x,
-    HasLocalTypeEnv x m,
-    HasTypeEnv x m,
-    HasProgramEnv x m,
+  ( HasLocalTypeEnv m,
+    HasTypeEnv m,
+    HasProgramEnv m,
     MonadLogger m,
     Fresh m,
-    MonadError (TypeError x) m
+    MonadError TypeError m
   ) =>
-  Expr x ->
-  m (Monotype x UniVar, GeneratedConstraint x)
+  Expr ->
+  m (Monotype UniVar, GeneratedConstraint)
 generateConstraint (CtorExpr k) = do
   d <- findDataCtor k
   (t, q) <- instantiateTypeScheme $ dataCtorTypeToTypeScheme d
@@ -133,7 +128,7 @@ generateConstraint (AnnotatedLetExpr x s e1 e2)
       let c = c1 <> Constraint (EqualityConstraint t1 (vacuous monotype))
       pure (t2, c2 <> ExistentialGeneratedConstraint delta (vacuous constraint) c)
 
-dataCtorTypeToTypeScheme :: DataCtorType x -> TypeScheme x
+dataCtorTypeToTypeScheme :: DataCtorType -> TypeScheme
 dataCtorTypeToTypeScheme DataCtorType {universalVars, existentialVars, constraint, fields, ctor, ctorArgs} =
   ForallTypeScheme {vars, constraint, monotype}
   where
@@ -142,13 +137,11 @@ dataCtorTypeToTypeScheme DataCtorType {universalVars, existentialVars, constrain
     ret = ApplyType ctor (fmap VarType ctorArgs)
 
 instantiateTypeScheme ::
-  ( Instantiable x (ExtensionMonotype x),
-    Instantiable x (ExtensionConstraint x),
-    Fresh m,
-    MonadError (TypeError x) m
+  ( Fresh m,
+    MonadError TypeError m
   ) =>
-  TypeScheme x ->
-  m (Monotype x UniVar, Constraint x UniVar)
+  TypeScheme ->
+  m (Monotype UniVar, Constraint UniVar)
 instantiateTypeScheme ForallTypeScheme {vars, constraint, monotype} = do
   (subst, _) <- fromBinders UniType vars
   q <- instantiateConstraint subst constraint
@@ -159,11 +152,11 @@ fromBinders ::
   ( Foldable t,
     Fresh m,
     GenFresh a,
-    MonadError (TypeError x) m
+    MonadError TypeError m
   ) =>
-  (a -> Monotype x UniVar) ->
+  (a -> Monotype UniVar) ->
   t TypeVar ->
-  m (Instantiator x, [a])
+  m (Instantiator, [a])
 fromBinders toMonotype = fmap g . foldlM f (mempty, [])
   where
     f (subst, vars) v = do
@@ -172,7 +165,7 @@ fromBinders toMonotype = fmap g . foldlM f (mempty, [])
       pure (HashMap.insert v (toMonotype a) subst, a : vars)
     g (subst, vars) = (Subst subst, vars)
 
-composeInstantiator :: MonadError (TypeError x) m => Instantiator x -> Instantiator x -> m (Instantiator x)
+composeInstantiator :: MonadError TypeError m => Instantiator -> Instantiator -> m Instantiator
 composeInstantiator (Subst m1) (Subst m2)
   | null intersection = pure . Subst $ HashMap.union m1 m2
   | otherwise = throwError . ConflictingTypeVars . head $ HashMap.keys intersection
@@ -180,25 +173,36 @@ composeInstantiator (Subst m1) (Subst m2)
     intersection = HashMap.intersection m1 m2
 
 instantiateMonotype ::
-  ( Instantiable x (Monotype x),
-    MonadError (TypeError x) m
-  ) =>
-  Instantiator x ->
-  SimpleMonotype x ->
-  m (Monotype x UniVar)
+  MonadError TypeError m =>
+  Instantiator ->
+  SimpleMonotype ->
+  m (Monotype UniVar)
 instantiateMonotype = instantiate . Subst.replaceAll
 
 instantiateConstraint ::
-  ( Instantiable x (Constraint x),
-    MonadError (TypeError x) m
+  ( MonadError TypeError m
   ) =>
-  Instantiator x ->
-  SimpleConstraint x ->
-  m (Constraint x UniVar)
+  Instantiator ->
+  SimpleConstraint ->
+  m (Constraint UniVar)
 instantiateConstraint = instantiate . Subst.replaceAll
 
-findDataCtor :: (HasProgramEnv x m, MonadError (TypeError x) m) => DataCtor -> m (DataCtorType x)
+findDataCtor :: (HasProgramEnv m, MonadError TypeError m) => DataCtor -> m DataCtorType
 findDataCtor k = lookupDataCtor k `orThrowM` UnboundDataCtor k
 
-findTermVar :: (HasTypeEnv x m, MonadError (TypeError x) m) => TermVar -> m (TypeScheme x)
+findTermVar :: (HasTypeEnv m, MonadError TypeError m) => TermVar -> m TypeScheme
 findTermVar x = lookupTermVar x `orThrowM` UnboundTermVar x
+
+class Instantiable f where
+  instantiate :: Applicative m => (TypeVar -> m (Monotype UniVar)) -> f Void -> m (f UniVar)
+
+instance Instantiable Monotype where
+  instantiate f (VarType v) = f v
+  instantiate f (ApplyType k ts) = ApplyType k <$> traverse (instantiate f) ts
+  instantiate f (FamilyApplyType k ts) = FamilyApplyType k <$> traverse (instantiate f) ts
+
+instance Instantiable Constraint where
+  instantiate _ EmptyConstraint = pure EmptyConstraint
+  instantiate f (ProductConstraint q1 q2) = ProductConstraint <$> instantiate f q1 <*> instantiate f q2
+  instantiate f (EqualityConstraint t1 t2) = EqualityConstraint <$> instantiate f t1 <*> instantiate f t2
+  instantiate f (TypeClassConstraint k ts) = TypeClassConstraint k <$> traverse (instantiate f) ts

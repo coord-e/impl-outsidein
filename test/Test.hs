@@ -1,8 +1,6 @@
-{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 
 import Control.Monad.Except (runExceptT)
 import Control.Monad.IO.Class (liftIO)
@@ -10,10 +8,6 @@ import Control.Monad.Logger (runNoLoggingT)
 import Data.Text (Text)
 import qualified Data.Text as Text (splitOn, strip, stripPrefix, takeWhile, unpack)
 import qualified Data.Text.IO as Text (readFile)
-import Language.Simple.ConstraintDomain (ConstraintDomain)
-import Language.Simple.ConstraintDomain.SimpleUnification (SimpleUnification)
-import Language.Simple.ConstraintDomain.TypeClass (TypeClass)
-import Language.Simple.ConstraintDomain.TypeClassTypeFamily (TypeClassTypeFamily)
 import Language.Simple.Parser (parseProgram)
 import Language.Simple.Type (typeProgram)
 import Prettyprinter (Pretty (..), defaultLayoutOptions, layoutPretty)
@@ -34,24 +28,17 @@ makeTestForFile path = do
     isOk = isExtensionOf "ok" path
     extractXNames =
       maybe
-        (map fst names)
+        ["class_family"]
         (map Text.strip . Text.splitOn ",")
         . Text.stripPrefix "// test:"
         . Text.takeWhile (/= '\n')
-    toTest name =
-      case lookup name names of
-        Just p -> testCase (Text.unpack name) . p isOk
-        Nothing -> error $ "unknown constraint domain " ++ show name
-    names =
-      [ ("simple", test @SimpleUnification),
-        ("class", test @TypeClass),
-        ("class_family", test @TypeClassTypeFamily)
-      ]
+    toTest "class_family" = testCase "class_family" . test isOk
+    toTest name = testCase (Text.unpack name <> " (skip)") . const (pure ())
 
-test :: forall x. ConstraintDomain x => Bool -> Text -> Assertion
+test :: Bool -> Text -> Assertion
 test isOk content = runNoLoggingT $ do
   program <-
-    runExceptT (parseProgram @x content) >>= \case
+    runExceptT (parseProgram content) >>= \case
       Left err -> liftIO . assertFailure $ prettyToString err
       Right x -> pure x
 

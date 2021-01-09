@@ -1,31 +1,28 @@
 {-# LANGUAGE PatternSynonyms #-}
 
-module Language.Simple.ConstraintDomain.TypeClassTypeFamily.Interact (interact) where
+module Language.Simple.Type.Solver.Interact (interact) where
 
 import Control.Monad (MonadPlus (..))
 import Control.Monad.Trans.Maybe (MaybeT)
 import qualified Data.HashSet as HashSet (member)
-import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Canonicalize (isCanonical)
-import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Extension (TypeClassTypeFamily)
-import Language.Simple.ConstraintDomain.TypeClassTypeFamily.Syntax
+import Language.Simple.Syntax (Constraint (..), Monotype (..))
+import Language.Simple.Type.Constraint (UniVar)
+import Language.Simple.Type.Solver.Canonicalize (isCanonical)
+import Language.Simple.Type.Solver.Syntax
   ( AtomicConstraint (..),
     fromAtomicConstraint,
+    ftv,
     syntacticEquals,
-    pattern FamilyApplyType,
     pattern FamilyFree,
     pattern FamilyFreeSeq,
+    pattern TvType,
   )
-import Language.Simple.ConstraintDomain.Util (ftv, pattern TvType)
-import Language.Simple.Syntax (Constraint (..))
-import Language.Simple.Type.Constraint (UniVar)
 import Language.Simple.Type.Substitution (substitute)
 import qualified Language.Simple.Type.Substitution as Subst (singleton)
 import Prelude hiding (interact)
 
-type X = TypeClassTypeFamily
-
 -- Fig. 22
-interact :: Monad m => AtomicConstraint -> AtomicConstraint -> MaybeT m (Constraint X UniVar)
+interact :: Monad m => AtomicConstraint -> AtomicConstraint -> MaybeT m (Constraint UniVar)
 interact q1@(EqualityAtomicConstraint (TvType tv1) (FamilyFree t1)) q2@(EqualityAtomicConstraint (TvType tv2) (FamilyFree t2))
   | tv1 == tv2 && isCanonical q1 && isCanonical q2 = pure $ fromAtomicConstraint q1 <> EqualityConstraint t1 t2
   | isCanonical q1 && isCanonical q2 && HashSet.member tv1 (ftv t2) =

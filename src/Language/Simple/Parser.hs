@@ -23,6 +23,8 @@ module Language.Simple.Parser
     applyMonotypeParser,
     monotypeParser,
     upperName,
+    classParser,
+    familyParser,
     lowerName,
     typeVarParser,
     namedTypeCtorParser,
@@ -42,15 +44,16 @@ import qualified Data.HashMap.Strict as HashMap (fromList)
 import Data.Text (Text, pack)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (fromList)
-import Language.Simple.ConstraintDomain (ExtensionConstraint, ExtensionMonotype, SyntaxExtension (..))
 import Language.Simple.Syntax
   ( AxiomScheme (..),
     Binding (..),
     CaseArm (..),
+    Class (..),
     Constraint (..),
     DataCtor (..),
     DataCtorType (..),
     Expr (..),
+    Family (..),
     Monotype (..),
     Program (..),
     SimpleConstraint,
@@ -65,7 +68,17 @@ import Lens.Micro (_1, _2, _3, _4)
 import Lens.Micro.Mtl ((%=))
 import Prettyprinter (Pretty (..), (<+>))
 import Text.Parser.Char (CharParsing (..), alphaNum, lower, text, upper)
-import Text.Parser.Combinators (Parsing (..), choice, eof, notFollowedBy, optional, sepEndBy, try, (<?>))
+import Text.Parser.Combinators
+  ( Parsing (..),
+    between,
+    choice,
+    eof,
+    notFollowedBy,
+    optional,
+    sepEndBy,
+    try,
+    (<?>),
+  )
 import Text.Parser.Token
   ( TokenParsing (..),
     braces,
@@ -88,13 +101,9 @@ instance Pretty ParseError where
   pretty (ParseFailed s) = "parse error:" <+> pretty s
 
 parseProgram ::
-  forall x m.
-  ( SyntaxExtension x (ExtensionConstraint x),
-    SyntaxExtension x (ExtensionMonotype x),
-    MonadError ParseError m
-  ) =>
+  MonadError ParseError m =>
   Text ->
-  m (Program x)
+  m Program
 parseProgram input =
   case parseOnly (runComment (whiteSpace *> programParser <* eof)) input of
     Left err -> throwError $ ParseFailed err
@@ -110,12 +119,10 @@ instance TokenParsing m => TokenParsing (Comment m) where
   highlight h (Comment p) = Comment $ highlight h p
 
 programParser ::
-  ( SyntaxExtension x (ExtensionConstraint x),
-    SyntaxExtension x (ExtensionMonotype x),
-    MonadPlus m,
+  ( MonadPlus m,
     TokenParsing m
   ) =>
-  m (Program x)
+  m Program
 programParser = makeProgram <$> execStateT (many toplevel) mempty
   where
     toplevel =
@@ -129,39 +136,19 @@ programParser = makeProgram <$> execStateT (many toplevel) mempty
     makeProgram (b, a, v, d) =
       Program (Vector.fromList b) (Vector.fromList a) (HashMap.fromList v) (HashMap.fromList d)
 
-axiomSchemeParser ::
-  ( SyntaxExtension x (ExtensionConstraint x),
-    SyntaxExtension x (ExtensionMonotype x),
-    TokenParsing m
-  ) =>
-  m (AxiomScheme x)
+axiomSchemeParser :: TokenParsing m => m AxiomScheme
 axiomSchemeParser = ForallAxiomScheme <$> orEmpty quant <*> orEmpty qual <*> constraintParser <?> "axiom scheme"
   where
     quant = textSymbol "forall" *> manyV typeVarParser <* dot
     qual = parensConstraintParser <* textSymbol "=>"
 
-typeDeclParser ::
-  ( SyntaxExtension x (ExtensionConstraint x),
-    SyntaxExtension x (ExtensionMonotype x),
-    TokenParsing m
-  ) =>
-  m (TermVar, TypeScheme x)
+typeDeclParser :: TokenParsing m => m (TermVar, TypeScheme)
 typeDeclParser = (,) <$> (termVarParser <* textSymbol "::") <*> typeSchemeParser
 
-dataCtorDeclParser ::
-  ( SyntaxExtension x (ExtensionConstraint x),
-    SyntaxExtension x (ExtensionMonotype x),
-    TokenParsing m
-  ) =>
-  m (DataCtor, DataCtorType x)
+dataCtorDeclParser :: TokenParsing m => m (DataCtor, DataCtorType)
 dataCtorDeclParser = (,) <$> (dataCtorParser <* textSymbol "::") <*> dataCtorTypeParser
 
-dataCtorTypeParser ::
-  ( SyntaxExtension x (ExtensionConstraint x),
-    SyntaxExtension x (ExtensionMonotype x),
-    TokenParsing m
-  ) =>
-  m (DataCtorType x)
+dataCtorTypeParser :: TokenParsing m => m DataCtorType
 dataCtorTypeParser =
   DataCtorType <$> orEmpty forallQuant
     <*> orEmpty existsQuant
@@ -175,12 +162,7 @@ dataCtorTypeParser =
     qual = parensConstraintParser <* textSymbol "=>"
     fieldParams = manyV (applyMonotypeParser <* textSymbol "->")
 
-bindingParser ::
-  ( SyntaxExtension x (ExtensionConstraint x),
-    SyntaxExtension x (ExtensionMonotype x),
-    TokenParsing m
-  ) =>
-  m (Binding x)
+bindingParser :: TokenParsing m => m Binding
 bindingParser =
   f <$> termVarParser
     <*> optional (textSymbol "::" *> typeSchemeParser)
@@ -189,12 +171,7 @@ bindingParser =
     f x Nothing = UnannotatedBinding x
     f x (Just s) = AnnotatedBinding x s
 
-exprParser ::
-  ( SyntaxExtension x (ExtensionConstraint x),
-    SyntaxExtension x (ExtensionMonotype x),
-    TokenParsing m
-  ) =>
-  m (Expr x)
+exprParser :: TokenParsing m => m Expr
 exprParser = foldl' ApplyExpr <$> atom <*> many atom <?> "expression"
   where
     atom =
@@ -214,64 +191,48 @@ exprParser = foldl' ApplyExpr <$> atom <*> many atom <?> "expression"
     f x Nothing = UnannotatedLetExpr x
     f x (Just s) = AnnotatedLetExpr x s
 
-caseArmParser ::
-  ( SyntaxExtension x (ExtensionConstraint x),
-    SyntaxExtension x (ExtensionMonotype x),
-    TokenParsing m
-  ) =>
-  m (CaseArm x)
+caseArmParser :: TokenParsing m => m CaseArm
 caseArmParser = CaseArm <$> dataCtorParser <*> manyV termVarParser <*> (textSymbol "=>" *> exprParser) <?> "case arm"
 
-typeSchemeParser ::
-  ( SyntaxExtension x (ExtensionConstraint x),
-    SyntaxExtension x (ExtensionMonotype x),
-    TokenParsing m
-  ) =>
-  m (TypeScheme x)
+typeSchemeParser :: TokenParsing m => m TypeScheme
 typeSchemeParser = ForallTypeScheme <$> orEmpty quant <*> orEmpty qual <*> monotypeParser <?> "type scheme"
   where
     quant = textSymbol "forall" *> manyV typeVarParser <* dot
     qual = parensConstraintParser <* textSymbol "=>"
 
-parensConstraintParser ::
-  ( SyntaxExtension x (ExtensionConstraint x),
-    SyntaxExtension x (ExtensionMonotype x),
-    TokenParsing m
-  ) =>
-  m (SimpleConstraint x)
+parensConstraintParser :: TokenParsing m => m SimpleConstraint
 parensConstraintParser = foldProd <$> prod <?> "constraint"
   where
     foldProd = foldr ProductConstraint EmptyConstraint
     prod = parens (commaSep constraintParser)
 
-constraintParser ::
-  ( SyntaxExtension x (ExtensionConstraint x),
-    SyntaxExtension x (ExtensionMonotype x),
-    TokenParsing m
-  ) =>
-  m (SimpleConstraint x)
+constraintParser :: TokenParsing m => m SimpleConstraint
 constraintParser =
-  -- `try` is carelessly placed here to parse typeclass-like constraint in `ext`
-  parensConstraintParser <|> try equal <|> ext
+  parensConstraintParser <|> try equal <|> class_
   where
     equal = EqualityConstraint <$> (monotypeParser <* textSymbol "~") <*> monotypeParser
-    ext = ExtensionConstraint <$> extensionParser
+    class_ = TypeClassConstraint <$> classParser <*> manyV atomMonotypeParser
 
-atomMonotypeParser :: (SyntaxExtension x (ExtensionMonotype x), TokenParsing m) => m (SimpleMonotype x)
+atomMonotypeParser :: TokenParsing m => m SimpleMonotype
 atomMonotypeParser =
   parens monotypeParser
     <|> VarType <$> typeVarParser
     <|> ApplyType <$> namedTypeCtorParser <*> pure mempty
-    <|> ExtensionType <$> extensionParser
+    <|> familyTypeParser
 
-applyMonotypeParser :: (SyntaxExtension x (ExtensionMonotype x), TokenParsing m) => m (SimpleMonotype x)
+applyMonotypeParser :: TokenParsing m => m SimpleMonotype
 applyMonotypeParser =
   parens monotypeParser
     <|> VarType <$> typeVarParser
     <|> ApplyType <$> namedTypeCtorParser <*> manyV atomMonotypeParser
-    <|> ExtensionType <$> extensionParser
+    <|> familyTypeParser
 
-monotypeParser :: (SyntaxExtension x (ExtensionMonotype x), TokenParsing m) => m (SimpleMonotype x)
+familyTypeParser :: TokenParsing m => m SimpleMonotype
+familyTypeParser = between (textSymbol "<") (textSymbol ">") inner
+  where
+    inner = FamilyApplyType <$> familyParser <*> manyV atomMonotypeParser
+
+monotypeParser :: TokenParsing m => m SimpleMonotype
 monotypeParser = f <$> applyMonotypeParser <*> many (textSymbol "->" *> applyMonotypeParser) <?> "type"
   where
     f t [] = t
@@ -308,6 +269,12 @@ namedDataCtorParser = NamedDataCtor <$> upperName
 
 dataCtorParser :: TokenParsing m => m DataCtor
 dataCtorParser = IntegerDataCtor <$> integer <|> namedDataCtorParser <?> "data constructor"
+
+classParser :: TokenParsing m => m Class
+classParser = Class <$> upperName <?> "type class"
+
+familyParser :: TokenParsing m => m Family
+familyParser = Family <$> upperName <?> "type family"
 
 manyV :: Alternative m => m a -> m (Vector a)
 manyV = fmap Vector.fromList . many

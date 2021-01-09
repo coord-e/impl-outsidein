@@ -24,9 +24,10 @@ module Language.Core.Syntax
     Coercion (..),
     Proposition (..),
     DataCtor (..),
-    FamilyCtor (..),
     TermVar (..),
     TypeVar (..),
+    Class (..),
+    Family (..),
     TypeCtor (..),
     CoercionVar (..),
   )
@@ -38,7 +39,13 @@ import Data.Text (Text)
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (fromList, null, toList)
 import GHC.Generics (Generic)
-import Language.Simple.Syntax (DataCtor (..), TermVar (..), TypeCtor (..), TypeVar (..))
+import Language.Simple.Syntax
+  ( Class (..),
+    DataCtor (..),
+    Family (..),
+    TermVar (..),
+    TypeVar (..),
+  )
 import Prettyprinter (Doc, Pretty (..), encloseSep, hsep, parens, (<+>))
 import Prettyprinter.Internal (unsafeTextWithoutNewlines)
 
@@ -161,18 +168,22 @@ data CoercionVarBinder = CoercionVarBinder CoercionVar Proposition
 instance Pretty CoercionVarBinder where
   pretty (CoercionVarBinder v p) = pretty v <+> "::" <+> pretty p
 
-newtype FamilyCtor = FamilyCtor Text
-  deriving stock (Ord, Eq, Generic)
-  deriving newtype (Show)
+data TypeCtor
+  = NamedTypeCtor Text
+  | ClassDictionaryTypeCtor Class
+  | FunctionTypeCtor
+  deriving stock (Show, Ord, Eq, Generic)
   deriving anyclass (Hashable)
 
-instance Pretty FamilyCtor where
-  pretty (FamilyCtor k) = unsafeTextWithoutNewlines k
+instance Pretty TypeCtor where
+  pretty (NamedTypeCtor k) = unsafeTextWithoutNewlines k
+  pretty (ClassDictionaryTypeCtor k) = "{" <> pretty k <> "}"
+  pretty FunctionTypeCtor = "(->)"
 
 data Type
   = VarType TypeVar
   | ApplyType TypeCtor (Vector Type)
-  | FamilyType FamilyCtor (Vector Type)
+  | FamilyApplyType Family (Vector Type)
   | ForallType TypeVar Type
   | CoercionForallType Proposition Type
   deriving (Generic, Show, Eq)
@@ -192,13 +203,13 @@ instance Pretty Type where
       isNested (FunctionType _ _) = True
       isNested _ = False
   pretty (ApplyType k ts) = hsep (pretty k : map prettyAtomType (Vector.toList ts))
-  pretty (FamilyType k ts) = "<" <> hsep (pretty k : map prettyAtomType (Vector.toList ts)) <> ">"
+  pretty (FamilyApplyType k ts) = "<" <> hsep (pretty k : map prettyAtomType (Vector.toList ts)) <> ">"
   pretty (ForallType v t) = "∀" <> pretty v <> "." <+> pretty t
   pretty (CoercionForallType p t) = "∀" <> parens (pretty p) <> "." <+> pretty t
 
 prettyAtomType :: Type -> Doc ann
 prettyAtomType v@VarType {} = pretty v
-prettyAtomType v@FamilyType {} = pretty v
+prettyAtomType v@FamilyApplyType {} = pretty v
 prettyAtomType v@(ApplyType _ ts) | Vector.null ts = pretty v
 prettyAtomType v = parens (pretty v)
 
@@ -228,7 +239,7 @@ data Coercion
   = AxiomCoercion AxiomName (Vector Type)
   | VarCoercion CoercionVar
   | TypeCtorCoercion TypeCtor (Vector Coercion)
-  | FamilyCtorCoercion FamilyCtor (Vector Coercion)
+  | FamilyCoercion Family (Vector Coercion)
   | ReflCoercion Type
   | TransCoercion Coercion Coercion
   | SymmCoercion Coercion
@@ -239,7 +250,7 @@ instance Pretty Coercion where
   pretty (AxiomCoercion n tys) = hsep (pretty n : map (("@" <>) . prettyAtomType) (Vector.toList tys))
   pretty (VarCoercion v) = pretty v
   pretty (TypeCtorCoercion k cs) = hsep (pretty k : map prettyAtomCoercion (Vector.toList cs))
-  pretty (FamilyCtorCoercion k cs) = "<" <> hsep (pretty k : map prettyAtomCoercion (Vector.toList cs)) <> ">"
+  pretty (FamilyCoercion k cs) = "<" <> hsep (pretty k : map prettyAtomCoercion (Vector.toList cs)) <> ">"
   pretty (ReflCoercion t) = "<" <> pretty t <> ">"
   pretty (TransCoercion c1 c2) = prettyAtomCoercion c1 <+> "∘" <+> prettyAtomCoercion c2
   pretty (SymmCoercion c) = "sym" <+> prettyAtomCoercion c
@@ -247,6 +258,6 @@ instance Pretty Coercion where
 
 prettyAtomCoercion :: Coercion -> Doc ann
 prettyAtomCoercion c@VarCoercion {} = pretty c
-prettyAtomCoercion c@FamilyCtorCoercion {} = pretty c
+prettyAtomCoercion c@FamilyCoercion {} = pretty c
 prettyAtomCoercion c@ReflCoercion {} = pretty c
 prettyAtomCoercion c = parens (pretty c)

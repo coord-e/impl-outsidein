@@ -183,10 +183,10 @@ coercionProposition (TypeCtorCoercion k cs) = do
   let lhs = ApplyType k (fmap takeLhs ps)
   let rhs = ApplyType k (fmap takeRhs ps)
   pure $ Proposition lhs rhs
-coercionProposition (FamilyCtorCoercion k cs) = do
+coercionProposition (FamilyCoercion k cs) = do
   ps <- traverse coercionProposition cs
-  let lhs = FamilyType k (fmap takeLhs ps)
-  let rhs = FamilyType k (fmap takeRhs ps)
+  let lhs = FamilyApplyType k (fmap takeLhs ps)
+  let rhs = FamilyApplyType k (fmap takeRhs ps)
   pure $ Proposition lhs rhs
 coercionProposition (ReflCoercion t) = checkType t $> Proposition t t
 coercionProposition (TransCoercion c1 c2) = do
@@ -210,7 +210,7 @@ takeRhs (Proposition _ rhs) = rhs
 checkType :: MonadError TypeError m => Type -> EnvT m ()
 checkType (VarType v) = findTypeVar v
 checkType (ApplyType _ ts) = traverse_ checkType ts
-checkType (FamilyType _ ts) = traverse_ checkType ts
+checkType (FamilyApplyType _ ts) = traverse_ checkType ts
 checkType (ForallType v t) = withTypeVar v $ checkType t
 checkType (CoercionForallType _ t) = checkType t
 

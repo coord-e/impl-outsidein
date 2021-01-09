@@ -4,7 +4,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 module Language.Simple.Type.Program
   ( typeProgram,
@@ -18,16 +17,14 @@ import Control.Monad.State (runStateT, state)
 import qualified Data.HashMap.Strict as HashMap (elems, empty, insert, lookup, size)
 import Data.Text (Text, pack)
 import qualified Data.Vector as Vector (fromList)
-import Data.Void (vacuous)
-import Language.Simple.ConstraintDomain (ConstraintDomain, Generalizable (..))
+import Data.Void (Void, vacuous)
 import Language.Simple.Fresh (Fresh (..))
 import Language.Simple.Syntax
   ( Binding (..),
     Constraint (..),
-    ExtensionConstraint,
-    ExtensionMonotype,
     Monotype (..),
     Program (..),
+    SimpleMonotype,
     TermVar,
     TypeScheme (..),
     TypeVar (..),
@@ -43,12 +40,10 @@ import Prettyprinter (Pretty (..), nest, (<+>))
 import Util (logDocInfo)
 
 typeProgram ::
-  forall x m.
-  ( ConstraintDomain x,
-    MonadLogger m,
-    MonadError (TypeError x) m
+  ( MonadLogger m,
+    MonadError TypeError m
   ) =>
-  Program x ->
+  Program ->
   m ()
 typeProgram Program {bindings, axioms, vars, dataCtors} =
   runEnvT axioms vars dataCtors . runBuiltinT $ foldr go (pure ()) bindings
@@ -58,16 +53,15 @@ typeProgram Program {bindings, axioms, vars, dataCtors} =
       withTermVar x s acc
 
 typeBinding ::
-  ( ConstraintDomain x,
-    HasLocalTypeEnv x m,
-    HasTypeEnv x m,
-    HasProgramEnv x m,
+  ( HasLocalTypeEnv m,
+    HasTypeEnv m,
+    HasProgramEnv m,
     Fresh m,
     MonadLogger m,
-    MonadError (TypeError x) m
+    MonadError TypeError m
   ) =>
-  Binding x ->
-  m (TermVar, TypeScheme x)
+  Binding ->
+  m (TermVar, TypeScheme)
 typeBinding (UnannotatedBinding x e) = do
   -- Generate
   a <- UniType <$> fresh
@@ -94,13 +88,10 @@ typeBinding (AnnotatedBinding x s@ForallTypeScheme {constraint, monotype} e) = d
   pure (x, s)
 
 generalizeToTypeScheme ::
-  ( Generalizable x (ExtensionMonotype x),
-    Generalizable x (ExtensionConstraint x),
-    Monad m
-  ) =>
-  Constraint x UniVar ->
-  Monotype x UniVar ->
-  m (TypeScheme x)
+  Monad m =>
+  Constraint UniVar ->
+  Monotype UniVar ->
+  m TypeScheme
 generalizeToTypeScheme q t = do
   ((constraint, monotype), vars) <- flip runStateT HashMap.empty $ do
     q' <- generalize gen q
@@ -128,3 +119,18 @@ intToName i = pack str
     str = showIntAtBase base (chars !!) i ""
     base = toEnum (length chars)
     chars = ['a' .. 'z']
+
+class Generalizable f where
+  generalize :: Applicative m => (UniVar -> m SimpleMonotype) -> f UniVar -> m (f Void)
+
+instance Generalizable Monotype where
+  generalize f (UniType u) = f u
+  generalize _ (VarType v) = pure $ VarType v
+  generalize f (ApplyType k ts) = ApplyType k <$> traverse (generalize f) ts
+  generalize f (FamilyApplyType k ts) = FamilyApplyType k <$> traverse (generalize f) ts
+
+instance Generalizable Constraint where
+  generalize _ EmptyConstraint = pure EmptyConstraint
+  generalize f (ProductConstraint q1 q2) = ProductConstraint <$> generalize f q1 <*> generalize f q2
+  generalize f (EqualityConstraint t1 t2) = EqualityConstraint <$> generalize f t1 <*> generalize f t2
+  generalize f (TypeClassConstraint k ts) = TypeClassConstraint k <$> traverse (generalize f) ts
