@@ -1,0 +1,12 @@
+// test: class, class_family
+
+data Pair :: forall a b. a -> b -> Pair a b
+
+axiom Show Bool
+axiom forall a b. (Show a, Show b) => Show (Pair a b)
+
+type show :: forall a. (Show a) => a -> String
+type parens :: String -> String
+
+let parens2Show = \x. parens (parensShow x)
+let parensShow = \x. parens (show x)
