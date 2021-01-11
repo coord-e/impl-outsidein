@@ -7,7 +7,7 @@ axiom forall m. <Add Z m> ~ m
 axiom forall n m. <Add (S n) m> ~ S <Add n m>
 
 data SZ :: forall a. (a ~ Z) => SNat a
-data SS :: forall a n. (a ~ S n) => SNat n -> SNat a
+data SS :: forall a. exists n. (a ~ S n) => SNat n -> SNat a
 
 data Refl :: forall a b. (a ~ b) => Eq a b
 

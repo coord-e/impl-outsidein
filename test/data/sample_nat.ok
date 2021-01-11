@@ -2,7 +2,7 @@ data Z :: Z
 data S :: forall n. n -> S n
 
 data SZ :: forall a. (a ~ Z) => SNat a
-data SS :: forall a n. (a ~ S n) => SNat n -> SNat a
+data SS :: forall a. exists n. (a ~ S n) => SNat n -> SNat a
 
 let two = SS (SS SZ)
 let num :: forall n. SNat n -> n = \x.
