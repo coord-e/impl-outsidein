@@ -34,7 +34,7 @@ parseProgram = handleError . Parser.parseProgram
 typeProgram :: Program -> App Core.Program
 typeProgram = handleError . Type.typeProgram
 
-checkCore :: Core.Program -> App ()
+checkCore :: Core.Program -> App Core.Program
 checkCore = handleError . Core.checkProgram
 
 runApp :: App a -> IO a

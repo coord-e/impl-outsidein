@@ -7,14 +7,14 @@
 
 module Language.Core.Type (checkProgram) where
 
-import Control.Monad (forM_, unless)
+import Control.Monad (forM, forM_, unless)
 import Control.Monad.Except (MonadError (..))
 import Control.Monad.Logger (MonadLogger)
 import Data.Foldable (traverse_)
-import Data.Functor (void, ($>))
+import Data.Functor (($>))
 import Data.Hashable (Hashable)
 import Data.Vector (Vector)
-import qualified Data.Vector as Vector (length, zip, (!?))
+import qualified Data.Vector as Vector (fromList, length, unzip, zip, (!), (!?))
 import Language.Core.Syntax
   ( AxiomName,
     AxiomScheme (..),
@@ -63,16 +63,19 @@ import Language.Simple.Fresh (Fresh (..))
 import Prettyprinter (pretty, (<+>))
 import Util (findDuplicate, logDocInfo, orThrowM)
 
-checkProgram :: (MonadLogger m, MonadError TypeError m) => Program -> m ()
-checkProgram Program {bindings, axioms, vars, dataCtors} = do
+checkProgram :: (MonadLogger m, MonadError TypeError m) => Program -> m Program
+checkProgram p@Program {bindings, axioms, vars, dataCtors} = do
   traverse_ checkAxiom axioms
   runEmptyEnvT $ traverse_ checkType vars
   traverse_ checkDataCtor dataCtors
-  runEnvT axioms vars dataCtors $ foldr go (pure ()) bindings
+  bindings' <- runEnvT axioms vars dataCtors $ foldr go (pure []) bindings
+  pure p {bindings = Vector.fromList bindings'}
   where
     go binding@(Binding b _) acc = do
       logDocInfo $ "checking" <+> pretty b
-      checkBinding binding >> withTermVar b acc
+      binding' <- checkBinding binding
+      acc' <- withTermVar b acc
+      pure (binding' : acc')
 
 checkAxiom :: (MonadLogger m, MonadError TypeError m) => AxiomScheme -> m ()
 checkAxiom ForallAxiomScheme {vars, lhs, rhs} = do
@@ -91,11 +94,13 @@ checkDataCtor DataCtorType {universalVars, existentialVars, fields, ctor, ctorAr
         traverse_ checkType fields
         checkType (ApplyType ctor $ fmap VarType ctorArgs)
 
-checkBinding :: (MonadLogger m, MonadError TypeError m) => Binding -> EnvT m ()
-checkBinding (Binding b e) = void . withTermVar b $ typeExpr e
+checkBinding :: (MonadLogger m, MonadError TypeError m) => Binding -> EnvT m Binding
+checkBinding (Binding b e) = do
+  (e', _) <- withTermVar b $ typeExpr e
+  pure (Binding b e')
 
-typeExpr :: (MonadLogger m, MonadError TypeError m) => CompleteExpr -> EnvT m CompleteType
-typeExpr (CtorExpr k) = do
+typeExpr :: (MonadLogger m, MonadError TypeError m) => CompleteExpr -> EnvT m (CompleteExpr, CompleteType)
+typeExpr e@(CtorExpr k) = do
   DataCtorType
     { universalVars,
       existentialVars,
@@ -106,44 +111,49 @@ typeExpr (CtorExpr k) = do
     } <-
     findDataCtor k
   let funTy = foldr FunctionType (ApplyType ctor $ fmap VarType ctorArgs) fields
-  refreshType $ foldr ForallType (foldr ForallType (foldr CoercionForallType funTy coercionVars) existentialVars) universalVars
-typeExpr (VarExpr x) = refreshType =<< findTermVar x
+  t <- refreshType $ foldr ForallType (foldr ForallType (foldr CoercionForallType funTy coercionVars) existentialVars) universalVars
+  pure (e, t)
+typeExpr e@(VarExpr x) = do
+  t <- findTermVar x
+  t' <- refreshType t
+  pure (e, t')
 typeExpr (LambdaExpr b@(TermVarBinder _ paramTy) e) = do
   checkType paramTy
-  bodyTy <- withTermVar b $ typeExpr e
-  pure $ FunctionType paramTy bodyTy
+  (e', bodyTy) <- withTermVar b $ typeExpr e
+  pure (LambdaExpr b e', FunctionType paramTy bodyTy)
 typeExpr (TypeLambdaExpr v e) = do
-  bodyTy <- withTypeVar v $ typeExpr e
-  pure $ ForallType v bodyTy
+  (e', bodyTy) <- withTypeVar v $ typeExpr e
+  pure (TypeLambdaExpr v e', ForallType v bodyTy)
 typeExpr (CoercionLambdaExpr b@(CoercionVarBinder _ p) e) = do
-  bodyTy <- withCoercionVar b $ typeExpr e
-  pure $ CoercionForallType p bodyTy
+  (e', bodyTy) <- withCoercionVar b $ typeExpr e
+  pure (CoercionLambdaExpr b e', CoercionForallType p bodyTy)
 typeExpr (ApplyExpr e1 e2) = do
-  t1 <- typeExpr e1
+  (e1', t1) <- typeExpr e1
   (paramTy, bodyTy) <- assertFunctionType t1
-  t2 <- typeExpr e2
+  (e2', t2) <- typeExpr e2
   assertTypeMatch t2 paramTy
-  pure bodyTy
+  pure (ApplyExpr e1' e2', bodyTy)
 typeExpr (TypeApplyExpr e t) = do
   checkType t
-  lhs <- typeExpr e
+  (e', lhs) <- typeExpr e
   (v, bodyTy) <- assertForallType lhs
-  pure $ substType (Subst.singleton v t) bodyTy
+  pure (TypeApplyExpr e' t, substType (Subst.singleton v t) bodyTy)
 typeExpr (CoercionApplyExpr e c) = do
-  t <- typeExpr e
-  p <- coercionProposition c
+  (e', t) <- typeExpr e
+  (c', p) <- coercionProposition c
   (p', bodyTy) <- assertCoercionForallType t
   assertPropositionMatch p p'
-  pure bodyTy
+  pure (CoercionApplyExpr e' c', bodyTy)
 typeExpr (CaseExpr e armTy arms) = do
-  t <- typeExpr e
+  (e', t) <- typeExpr e
   (k, params) <- assertApplyType t
-  forM_ arms $ \arm -> do
-    armTy' <- typeArm k params arm
+  arms' <- forM arms $ \arm -> do
+    (arm', armTy') <- typeArm k params arm
     assertTypeMatch armTy' armTy
-  pure armTy
+    pure arm'
+  pure (CaseExpr e' armTy arms', armTy)
   where
-    typeArm k params CaseArm {ctor, typeArgs, existentialVars, coercionVars, termVars, body} = do
+    typeArm k params arm@CaseArm {ctor, typeArgs, existentialVars, coercionVars, termVars, body} = do
       DataCtorType
         { universalVars,
           existentialVars = existentialVars',
@@ -171,17 +181,21 @@ typeExpr (CaseExpr e armTy arms) = do
           assertLengthMatch params ctorArgs
           forM_ (Vector.zip params ctorArgs) $
             \(t, t') -> assertTypeMatch t (substType subst (VarType t'))
-          withTermVars termVars $ typeExpr body
-typeExpr (LetExpr _ b@(TermVarBinder _ t) e1 e2) = do
+          (body', bodyTy) <- withTermVars termVars $ typeExpr body
+          pure (arm {body = body'}, bodyTy)
+typeExpr (LetExpr mid b@(TermVarBinder _ t) e1 e2) = do
   checkType t
-  t1 <- withTermVar b $ typeExpr e1
+  (e1', t1) <- withTermVar b $ typeExpr e1
   assertTypeMatch t1 t
-  withTermVar b $ typeExpr e2
+  (e2', t2) <- withTermVar b $ typeExpr e2
+  pure (LetExpr mid b e1' e2', t2)
 typeExpr (CastExpr e c) = do
-  t <- typeExpr e
-  Proposition t1 t2 <- coercionProposition c
+  (e', t) <- typeExpr e
+  (c', Proposition t1 t2) <- coercionProposition c
   assertTypeMatch t t1
-  pure t2
+  case c' of
+    ReflCoercion _ -> pure (e', t2)
+    _ -> pure (CastExpr e' c', t2)
 
 refreshType :: Fresh m => CompleteType -> m CompleteType
 refreshType (ForallType v t) = do
@@ -190,44 +204,68 @@ refreshType (ForallType v t) = do
   pure (ForallType v' t')
 refreshType t = pure t
 
-coercionProposition :: MonadError TypeError m => CompleteCoercion -> EnvT m CompleteProposition
-coercionProposition (AxiomCoercion n tys) = do
+coercionProposition :: MonadError TypeError m => CompleteCoercion -> EnvT m (CompleteCoercion, CompleteProposition)
+coercionProposition c@(AxiomCoercion n tys) = do
   ForallAxiomScheme {vars, lhs, rhs} <- findAxiomScheme n
   assertLengthMatch vars tys
   let subst = Subst.fromVars vars tys
-  pure $ Proposition (substType subst lhs) (substType subst rhs)
-coercionProposition (VarCoercion v) = findCoercionVar v
+  pure (c, Proposition (substType subst lhs) (substType subst rhs))
+coercionProposition c@(VarCoercion v) = do
+  p <- findCoercionVar v
+  pure (c, p)
 coercionProposition (TypeCtorCoercion k cs) = do
-  ps <- traverse coercionProposition cs
+  (cs', ps) <- Vector.unzip <$> traverse coercionProposition cs
   let lhs = ApplyType k (fmap takePropositionLhs ps)
   let rhs = ApplyType k (fmap takePropositionRhs ps)
-  pure $ Proposition lhs rhs
+  let proposition = Proposition lhs rhs
+  case allRefl cs' of
+    Just ts -> pure (ReflCoercion (ApplyType k ts), proposition)
+    Nothing -> pure (TypeCtorCoercion k cs', proposition)
 coercionProposition (FamilyCoercion k cs) = do
-  ps <- traverse coercionProposition cs
+  (cs', ps) <- Vector.unzip <$> traverse coercionProposition cs
   let lhs = FamilyApplyType k (fmap takePropositionLhs ps)
   let rhs = FamilyApplyType k (fmap takePropositionRhs ps)
-  pure $ Proposition lhs rhs
+  let proposition = Proposition lhs rhs
+  case allRefl cs' of
+    Just ts -> pure (ReflCoercion (FamilyApplyType k ts), proposition)
+    Nothing -> pure (FamilyCoercion k cs', proposition)
 coercionProposition (RightCoercion n c) = do
-  Proposition lhs rhs <- coercionProposition c
+  (c', Proposition lhs rhs) <- coercionProposition c
   (_, ts1) <- assertApplyType lhs
   (_, ts2) <- assertApplyType rhs
   t1 <- assertIndex ts1 n
   t2 <- assertIndex ts2 n
-  pure (Proposition t1 t2)
-coercionProposition (ReflCoercion t) = checkType t $> Proposition t t
+  let proposition = Proposition t1 t2
+  case c' of
+    ReflCoercion (ApplyType _ ts) -> pure (ReflCoercion (ts Vector.! n), proposition)
+    _ -> pure (RightCoercion n c', proposition)
+coercionProposition c@(ReflCoercion t) = checkType t $> (c, Proposition t t)
 coercionProposition (TransCoercion c1 c2) = do
-  Proposition lhs1 rhs1 <- coercionProposition c1
-  Proposition lhs2 rhs2 <- coercionProposition c2
+  (c1', Proposition lhs1 rhs1) <- coercionProposition c1
+  (c2', Proposition lhs2 rhs2) <- coercionProposition c2
   assertTypeMatch rhs1 lhs2
-  pure $ Proposition lhs1 rhs2
+  let proposition = Proposition lhs1 rhs2
+  case (c1', c2') of
+    (ReflCoercion _, _) -> pure (c2', proposition)
+    (_, ReflCoercion _) -> pure (c1', proposition)
+    (_, _) -> pure (TransCoercion c1' c2', proposition)
 coercionProposition (SymmCoercion c) = do
-  Proposition t1 t2 <- coercionProposition c
-  pure $ Proposition t2 t1
+  (c', Proposition t1 t2) <- coercionProposition c
+  let proposition = Proposition t2 t1
+  case c' of
+    ReflCoercion _ -> pure (c', proposition)
+    _ -> pure (SymmCoercion c', proposition)
 coercionProposition (EquivalentCoercion c1 c2) = do
-  p1 <- coercionProposition c1
-  p2 <- coercionProposition c2
+  (c1', p1) <- coercionProposition c1
+  (_, p2) <- coercionProposition c2
   assertPropositionMatch p1 p2
-  pure p1
+  pure (c1', p1)
+
+allRefl :: Vector CompleteCoercion -> Maybe (Vector CompleteType)
+allRefl = traverse f
+  where
+    f (ReflCoercion t) = Just t
+    f _ = Nothing
 
 checkType :: MonadError TypeError m => CompleteType -> EnvT m ()
 checkType (VarType v) = findTypeVar v

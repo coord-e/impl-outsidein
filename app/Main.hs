@@ -12,7 +12,8 @@ typeFile file = do
   program <- parseProgram content
   core <- typeProgram program
   liftIO . Text.putStr $ Core.printProgram core
-  checkCore core
+  simpleCore <- checkCore core
+  liftIO . Text.putStr $ Core.printProgram simpleCore
 
 main :: IO ()
 main = do

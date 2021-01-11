@@ -5,6 +5,7 @@
 import Control.Monad.Except (runExceptT)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Logger (runNoLoggingT)
+import Data.Functor (void)
 import Data.Text (Text)
 import qualified Data.Text as Text (splitOn, strip, stripPrefix, takeWhile, unpack)
 import qualified Data.Text.IO as Text (readFile)
@@ -47,11 +48,14 @@ test isOk content = runNoLoggingT $ do
     Left err | isOk -> liftIO . assertFailure $ prettyToString err
     Left _ -> pure ()
     Right _ | not isOk -> liftIO $ assertFailure "unexpectedly typechecked"
-    Right core ->
-      runExceptT (checkProgram core) >>= \case
-        Left err -> liftIO . assertFailure $ prettyToString err
-        Right _ -> pure ()
+    Right core -> do
+      simpleCore <- assertRight $ checkProgram core
+      void . assertRight $ checkProgram simpleCore
   where
+    assertRight a =
+      runExceptT a >>= \case
+        Right x -> pure x
+        Left err -> liftIO . assertFailure $ prettyToString err
     prettyToString :: Pretty a => a -> String
     prettyToString = renderString . layoutPretty defaultLayoutOptions . pretty
 
