@@ -43,7 +43,7 @@ import qualified Data.HashSet as HashSet (toMap)
 import Data.Hashable (Hashable)
 import Language.Simple.Fresh (Fresh (..))
 import Language.Simple.Syntax (Constraint (..), Monotype (..), TypeVar)
-import Language.Simple.Type.Constraint (GeneratedConstraint (..), UniVar)
+import Language.Simple.Type.Constraint (AtomicConstraint (..), GeneratedConstraint (..), GivenConstraint (..), UniVar)
 import Language.Simple.Type.Error (TypeError (..))
 import Prettyprinter (Pretty (..), list, (<+>))
 import Util (fromJustOr, orThrow)
@@ -118,10 +118,22 @@ fromBinders = foldlM go empty
 class Substitutable a b where
   substitute :: Subst a -> b -> b
 
+instance Substitutable a b => Substitutable a [b] where
+  substitute s = map (substitute s)
+
 instance Substitutable UniVar GeneratedConstraint where
-  substitute s (Constraint q) = Constraint (substitute s q)
+  substitute _ EmptyGeneratedConstraint = EmptyGeneratedConstraint
+  substitute s (AtomicGeneratedConstraint q) = AtomicGeneratedConstraint (substitute s q)
   substitute s (ProductGeneratedConstraint c1 c2) = ProductGeneratedConstraint (substitute s c1) (substitute s c2)
-  substitute s (ExistentialGeneratedConstraint vs p c) = ExistentialGeneratedConstraint vs (substitute s p) (substitute s c)
+  substitute s (ExistentialGeneratedConstraint id vs p c) = ExistentialGeneratedConstraint id vs (substitute s p) (substitute s c)
+
+instance Substitutable a (Monotype UniVar) => Substitutable a AtomicConstraint where
+  substitute s (EqualityAtomicConstraint id t1 t2) = EqualityAtomicConstraint id (substitute s t1) (substitute s t2)
+  substitute s (TypeClassAtomicConstraint id k ts) = TypeClassAtomicConstraint id k $ fmap (substitute s) ts
+
+instance Substitutable a (Monotype UniVar) => Substitutable a GivenConstraint where
+  substitute s (EqualityGivenConstraint e t1 t2) = EqualityGivenConstraint e (substitute s t1) (substitute s t2)
+  substitute s (TypeClassGivenConstraint e k ts) = TypeClassGivenConstraint e k $ fmap (substitute s) ts
 
 instance Substitutable a (Monotype UniVar) => Substitutable a (Constraint UniVar) where
   substitute _ EmptyConstraint = EmptyConstraint

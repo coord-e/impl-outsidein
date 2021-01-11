@@ -1,6 +1,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Language.Core.Type.Env
   ( EnvT,
@@ -18,7 +19,9 @@ module Language.Core.Type.Env
 where
 
 import Control.Monad.Except (MonadError)
+import Control.Monad.Logger (MonadLogger)
 import Control.Monad.Reader (ReaderT (..), asks, local, runReaderT)
+import Control.Monad.State (StateT (..), evalStateT, state)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap (empty, insert, lookup)
 import Data.HashSet (HashSet)
@@ -32,12 +35,15 @@ import Language.Core.Syntax
     CompleteProposition,
     CompleteTermVarBinder,
     CompleteType,
-    DataCtor,
+    DataCtor (..),
     DataCtorType,
     TermVar,
     TermVarBinder (..),
     TypeVar,
+    simpleDataCtorType,
   )
+import Language.Simple.Fresh (Fresh (..), fromFreshNatural)
+import Numeric.Natural (Natural)
 
 data Env = Env
   { axioms :: HashMap AxiomName AxiomScheme,
@@ -47,8 +53,13 @@ data Env = Env
     typeVars :: HashSet TypeVar
   }
 
-newtype EnvT m a = MkEnvT (ReaderT Env m a)
-  deriving newtype (Functor, Applicative, Monad, MonadError e)
+newtype EnvT m a = MkEnvT (ReaderT Env (StateT Natural m) a)
+  deriving newtype (Functor, Applicative, Monad, MonadLogger, MonadError e)
+
+instance Monad m => Fresh (EnvT m) where
+  fresh = MkEnvT $ state f
+    where
+      f n = (fromFreshNatural n, succ n)
 
 withTermVar :: Monad m => CompleteTermVarBinder -> EnvT m a -> EnvT m a
 withTermVar (TermVarBinder x t) (MkEnvT a) = MkEnvT $ local f a
@@ -68,7 +79,16 @@ withCoercionVar (CoercionVarBinder v p) (MkEnvT a) = MkEnvT $ local f a
 lookupTermVar :: Monad m => TermVar -> EnvT m (Maybe CompleteType)
 lookupTermVar x = MkEnvT . asks $ HashMap.lookup x . vars
 
+boolDataCtorType :: DataCtorType
+boolDataCtorType = simpleDataCtorType "Bool"
+
+intDataCtorType :: DataCtorType
+intDataCtorType = simpleDataCtorType "Int"
+
 lookupDataCtor :: Monad m => DataCtor -> EnvT m (Maybe DataCtorType)
+lookupDataCtor (NamedDataCtor "True") = pure $ Just boolDataCtorType
+lookupDataCtor (NamedDataCtor "False") = pure $ Just boolDataCtorType
+lookupDataCtor (IntegerDataCtor _) = pure $ Just intDataCtorType
 lookupDataCtor k = MkEnvT . asks $ HashMap.lookup k . dataCtors
 
 lookupAxiomScheme :: Monad m => AxiomName -> EnvT m (Maybe AxiomScheme)
@@ -87,7 +107,7 @@ runEnvT ::
   HashMap DataCtor DataCtorType ->
   EnvT m a ->
   m a
-runEnvT axioms vars dataCtors (MkEnvT a) = runReaderT a initEnv
+runEnvT axioms vars dataCtors (MkEnvT a) = evalStateT (runReaderT a initEnv) 0
   where
     initEnv =
       Env

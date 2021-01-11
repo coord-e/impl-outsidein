@@ -21,10 +21,11 @@ import Control.Monad.Except (MonadError)
 import Control.Monad.Logger (MonadLogger)
 import Control.Monad.Reader (ReaderT (..), asks, local, runReaderT)
 import Control.Monad.State (StateT (..), evalStateT, state)
+import Control.Monad.Trans (lift)
+import Control.Monad.Trans.Writer.CPS (WriterT)
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap (insert, lookup)
 import Data.HashSet (HashSet)
-import Data.Vector (Vector)
 import Language.Simple.Fresh (Fresh (..), fromFreshNatural)
 import Language.Simple.Syntax
   ( AxiomScheme,
@@ -35,7 +36,7 @@ import Language.Simple.Syntax
     TypeCtor (..),
     TypeScheme,
   )
-import Language.Simple.Type.Constraint (Fuv (..), UniVar)
+import Language.Simple.Type.Constraint (AxiomSchemeId, Fuv (..), UniVar)
 import Numeric.Natural (Natural)
 
 class Monad m => HasTypeEnv m where
@@ -49,12 +50,16 @@ class Monad m => HasLocalTypeEnv m where
 
 class Monad m => HasProgramEnv m where
   lookupDataCtor :: DataCtor -> m (Maybe DataCtorType)
-  getAxiomSchemes :: m (Vector AxiomScheme)
+  getAxiomSchemes :: m (HashMap AxiomSchemeId AxiomScheme)
+
+instance (Monoid w, HasProgramEnv m) => HasProgramEnv (WriterT w m) where
+  lookupDataCtor k = lift (lookupDataCtor k)
+  getAxiomSchemes = lift getAxiomSchemes
 
 data Env = Env
   { vars :: HashMap TermVar TypeScheme,
     localVars :: HashMap TermVar (Monotype UniVar),
-    axioms :: Vector AxiomScheme,
+    axioms :: HashMap AxiomSchemeId AxiomScheme,
     dataCtors :: HashMap DataCtor DataCtorType
   }
 
@@ -85,7 +90,7 @@ instance Monad m => Fresh (EnvT m) where
 
 runEnvT ::
   Monad m =>
-  Vector AxiomScheme ->
+  HashMap AxiomSchemeId AxiomScheme ->
   HashMap TermVar TypeScheme ->
   HashMap DataCtor DataCtorType ->
   EnvT m a ->

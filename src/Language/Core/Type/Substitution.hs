@@ -4,6 +4,7 @@
 
 module Language.Core.Type.Substitution
   ( substType,
+    substProposition,
     Subst (..),
     fromVars,
     singleton,
@@ -15,7 +16,7 @@ import qualified Data.HashMap.Strict as HashMap (delete, fromList, lookup, singl
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector (toList, zip)
 import GHC.Generics (Generic)
-import Language.Core.Syntax (CompleteType, Type (..), TypeVar)
+import Language.Core.Syntax (CompleteProposition, CompleteType, Proposition (..), Type (..), TypeVar)
 
 newtype Subst = Subst (HashMap TypeVar CompleteType)
   deriving stock (Eq, Generic)
@@ -28,7 +29,10 @@ substType (Subst m) (VarType v)
 substType s (ApplyType k ts) = ApplyType k (fmap (substType s) ts)
 substType s (FamilyApplyType k ts) = FamilyApplyType k (fmap (substType s) ts)
 substType (Subst m) (ForallType v t) = ForallType v (substType (Subst $ HashMap.delete v m) t)
-substType s (CoercionForallType b t) = CoercionForallType b (substType s t)
+substType s (CoercionForallType p t) = CoercionForallType (substProposition s p) (substType s t)
+
+substProposition :: Subst -> CompleteProposition -> CompleteProposition
+substProposition s (Proposition t1 t2) = Proposition (substType s t1) (substType s t2)
 
 fromVars :: Vector TypeVar -> Vector CompleteType -> Subst
 fromVars vs ts = Subst . HashMap.fromList . Vector.toList $ Vector.zip vs ts

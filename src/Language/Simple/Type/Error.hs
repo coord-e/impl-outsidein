@@ -12,14 +12,13 @@ where
 
 import GHC.Generics (Generic)
 import Language.Simple.Syntax
-  ( Constraint (..),
-    DataCtor,
+  ( DataCtor,
     Monotype,
     TermVar,
     TypeVar,
   )
-import Language.Simple.Type.Constraint (UniVar)
-import Prettyprinter (Pretty (..), dquotes, nest, sep, (<+>))
+import Language.Simple.Type.Constraint (AtomicConstraint, GivenConstraint, UniVar)
+import Prettyprinter (Pretty (..), dquotes, nest, sep, tupled, (<+>))
 
 data TypeError
   = UnboundTermVar TermVar
@@ -31,8 +30,8 @@ data TypeError
         expected :: Int,
         got :: Int
       }
-  | UnresolvedConstraint (Constraint UniVar)
-  | MatchingGivenConstraint (Constraint UniVar)
+  | UnresolvedConstraint [AtomicConstraint]
+  | MatchingGivenConstraint GivenConstraint
   | OccurCheckError (Monotype UniVar) (Monotype UniVar)
   | MismatchedTypes (Monotype UniVar) (Monotype UniVar)
   deriving (Generic)
@@ -52,7 +51,7 @@ instance Pretty TypeError where
           "but got"
             <+> pretty got
         ]
-  pretty (UnresolvedConstraint q) = "unresolved constraint:" <+> pretty q
+  pretty (UnresolvedConstraint qs) = "unresolved constraint:" <+> tupled (map pretty qs)
   pretty (MatchingGivenConstraint q) = "the constraint" <+> pretty q <+> "matches an instance declaration"
   pretty (OccurCheckError t1 t2) = "occur check failed:" <+> pretty t1 <+> "~" <+> pretty t2
   pretty (MismatchedTypes t1 t2) =

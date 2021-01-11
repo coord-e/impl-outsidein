@@ -12,11 +12,10 @@ module Language.Simple.Type.Solver.Syntax
     ConstraintLocation (..),
     FamilyType (..),
     ClassConstraint (..),
-    AtomicConstraint (..),
+    substituteTypeWithTv,
+    substituteTypesWithTv,
     isFamilyType,
     isFamilyFree,
-    atomicConstraints,
-    fromAtomicConstraint,
     syntacticEqual,
     syntacticEquals,
     Tv (..),
@@ -28,17 +27,18 @@ module Language.Simple.Type.Solver.Syntax
   )
 where
 
-import Control.Monad (MonadPlus (..))
 import Data.Foldable (foldlM)
 import qualified Data.HashMap.Strict as HashMap (lookup)
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet (empty, singleton, union)
 import Data.Hashable (Hashable)
 import Data.Vector (Vector)
-import qualified Data.Vector as Vector (zip)
+import qualified Data.Vector as Vector (unzip, zip)
 import GHC.Generics (Generic)
+import qualified Language.Core.Syntax as Core
 import Language.Simple.Syntax (Class, Constraint (..), Family, Monotype (..), TypeVar)
-import Language.Simple.Type.Constraint (UniVar)
+import Language.Simple.Type.Constraint (GeneratedCoreCoercion, UniVar)
+import Language.Simple.Type.Generator (toCoreTypeCtor)
 import Language.Simple.Type.Substitution (Subst (..), Substitutable (..))
 import qualified Language.Simple.Type.Substitution as Subst (empty, merge, singleton)
 import Prettyprinter (Pretty (..))
@@ -75,28 +75,6 @@ instance Pretty a => Pretty (FamilyType a) where
   pretty (FamilyType k ts) = pretty (FamilyApplyType k ts)
 
 data ClassConstraint a = ClassConstraint Class (Vector (Monotype a))
-
-data AtomicConstraint
-  = EqualityAtomicConstraint (Monotype UniVar) (Monotype UniVar)
-  | ClassAtomicConstraint Class (Vector (Monotype UniVar))
-  deriving (Generic)
-
-instance Pretty AtomicConstraint where
-  pretty = pretty . fromAtomicConstraint
-
-atomicConstraints :: Constraint UniVar -> [AtomicConstraint]
-atomicConstraints EmptyConstraint = mzero
-atomicConstraints (ProductConstraint q1 q2) = atomicConstraints q1 `mplus` atomicConstraints q2
-atomicConstraints (EqualityConstraint t1 t2) = pure $ EqualityAtomicConstraint t1 t2
-atomicConstraints (TypeClassConstraint k ts) = pure $ ClassAtomicConstraint k ts
-
-fromAtomicConstraint :: AtomicConstraint -> Constraint UniVar
-fromAtomicConstraint (EqualityAtomicConstraint t1 t2) = EqualityConstraint t1 t2
-fromAtomicConstraint (ClassAtomicConstraint k ts) = TypeClassConstraint k ts
-
-instance Substitutable UniVar AtomicConstraint where
-  substitute s (EqualityAtomicConstraint t1 t2) = EqualityAtomicConstraint (substitute s t1) (substitute s t2)
-  substitute s (ClassAtomicConstraint k ts) = ClassAtomicConstraint k (fmap (substitute s) ts)
 
 syntacticEqual :: Monotype UniVar -> Monotype UniVar -> Bool
 syntacticEqual (UniType u1) (UniType u2) = u1 == u2
@@ -178,3 +156,22 @@ matchTypes ts1 ts2
     simpleEqual (ApplyType k1 ts1') (ApplyType k2 ts2') = k1 == k2 && simpleEquals ts1' ts2'
     simpleEqual _ _ = False
     simpleEquals v1 v2 = all (uncurry simpleEqual) (Vector.zip v1 v2)
+
+-- substitute `v` with `t1` in `t2` witnessed by `c1 :: TvType tv ~ t1` to `t3` and construct `c2 :: t2 ~ t3` using `c1`
+-- where `(t3, c2) = substituteTypeWithTv c1 tv t1 t2`
+substituteTypeWithTv :: GeneratedCoreCoercion -> Tv -> Monotype UniVar -> Monotype UniVar -> (Monotype UniVar, GeneratedCoreCoercion)
+substituteTypeWithTv c tv t (VarType v)
+  | tv == RigidTv v = (t, c)
+  | otherwise = (VarType v, Core.ReflCoercion (Core.VarType v))
+substituteTypeWithTv c tv t (UniType u)
+  | tv == UniTv u = (t, c)
+  | otherwise = (UniType u, Core.ReflCoercion (Core.UniType u))
+substituteTypeWithTv c tv t (ApplyType k ts) = (ApplyType k ts', Core.TypeCtorCoercion (toCoreTypeCtor k) cs)
+  where
+    (ts', cs) = substituteTypesWithTv c tv t ts
+substituteTypeWithTv c tv t (FamilyApplyType k ts) = (FamilyApplyType k ts', Core.FamilyCoercion k cs)
+  where
+    (ts', cs) = substituteTypesWithTv c tv t ts
+
+substituteTypesWithTv :: GeneratedCoreCoercion -> Tv -> Monotype UniVar -> Vector (Monotype UniVar) -> (Vector (Monotype UniVar), Vector GeneratedCoreCoercion)
+substituteTypesWithTv c tv t ts = Vector.unzip $ fmap (substituteTypeWithTv c tv t) ts

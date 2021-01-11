@@ -4,12 +4,13 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module App (App, runApp, parseProgram, typeProgram) where
+module App (App, runApp, parseProgram, typeProgram, checkCore) where
 
 import Control.Monad.Except (ExceptT (..), runExceptT)
 import Control.Monad.IO.Class (MonadIO (..))
 import Control.Monad.Logger (LoggingT, MonadLogger, logErrorN, runStdoutLoggingT)
 import Data.Text (Text)
+import qualified Language.Core as Core (Program, checkProgram)
 import qualified Language.Simple.Parser as Parser (parseProgram)
 import Language.Simple.Syntax (Program)
 import qualified Language.Simple.Type as Type (typeProgram)
@@ -30,8 +31,11 @@ handleError a = do
 parseProgram :: Text -> App Program
 parseProgram = handleError . Parser.parseProgram
 
-typeProgram :: Program -> App ()
+typeProgram :: Program -> App Core.Program
 typeProgram = handleError . Type.typeProgram
+
+checkCore :: Core.Program -> App ()
+checkCore = handleError . Core.checkProgram
 
 runApp :: App a -> IO a
 runApp (App a) = runStdoutLoggingT $ do

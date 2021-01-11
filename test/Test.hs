@@ -8,6 +8,7 @@ import Control.Monad.Logger (runNoLoggingT)
 import Data.Text (Text)
 import qualified Data.Text as Text (splitOn, strip, stripPrefix, takeWhile, unpack)
 import qualified Data.Text.IO as Text (readFile)
+import Language.Core.Type (checkProgram)
 import Language.Simple.Parser (parseProgram)
 import Language.Simple.Type (typeProgram)
 import Prettyprinter (Pretty (..), defaultLayoutOptions, layoutPretty)
@@ -44,8 +45,12 @@ test isOk content = runNoLoggingT $ do
 
   runExceptT (typeProgram program) >>= \case
     Left err | isOk -> liftIO . assertFailure $ prettyToString err
-    Right () | not isOk -> liftIO $ assertFailure "unexpectedly typechecked"
-    _ -> pure ()
+    Left _ -> pure ()
+    Right _ | not isOk -> liftIO $ assertFailure "unexpectedly typechecked"
+    Right core ->
+      runExceptT (checkProgram core) >>= \case
+        Left err -> liftIO . assertFailure $ prettyToString err
+        Right _ -> pure ()
   where
     prettyToString :: Pretty a => a -> String
     prettyToString = renderString . layoutPretty defaultLayoutOptions . pretty

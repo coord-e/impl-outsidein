@@ -138,6 +138,9 @@ newtype TermVar = TermVar Text
 instance Pretty TermVar where
   pretty (TermVar x) = unsafeTextWithoutNewlines x
 
+instance GenFresh TermVar where
+  fromFreshNatural = TermVar . pack . ("'x" ++) . show
+
 -- | Data constructor.
 data DataCtor
   = NamedDataCtor Text
@@ -238,7 +241,7 @@ instance Pretty TypeVar where
   pretty (TypeVar v) = unsafeTextWithoutNewlines v
 
 instance GenFresh TypeVar where
-  fromFreshNatural = TypeVar . pack . ("a" ++) . show
+  fromFreshNatural = TypeVar . pack . ("'a" ++) . show
 
 -- | Type class.
 newtype Class = Class Text
