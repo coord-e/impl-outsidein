@@ -66,7 +66,23 @@ import Language.Simple.Syntax
     TypeVar (..),
   )
 import Numeric.Natural (Natural)
-import Prettyprinter (Doc, Pretty (..), defaultLayoutOptions, encloseSep, hsep, layoutPretty, parens, unsafeViaShow, (<+>))
+import Prettyprinter
+  ( Doc,
+    Pretty (..),
+    align,
+    defaultLayoutOptions,
+    hsep,
+    layoutPretty,
+    line,
+    nest,
+    parens,
+    punctuate,
+    sep,
+    space,
+    unsafeViaShow,
+    vsep,
+    (<+>),
+  )
 import Prettyprinter.Internal (unsafeTextWithoutNewlines)
 import Prettyprinter.Render.Text (renderStrict)
 
@@ -99,7 +115,7 @@ data Binding = Binding CompleteTermVarBinder CompleteExpr
   deriving (Generic, Show, Eq)
 
 instance Pretty Binding where
-  pretty (Binding b e) = pretty b <+> "=" <+> pretty e
+  pretty (Binding b e) = pretty b <+> "=" <> nest 2 (line <> pretty e)
 
 data AxiomScheme = ForallAxiomScheme
   { vars :: Vector TypeVar,
@@ -110,10 +126,11 @@ data AxiomScheme = ForallAxiomScheme
 
 instance Pretty AxiomScheme where
   pretty ForallAxiomScheme {vars, lhs, rhs} =
-    hsep
-      [ "∀" <> hsep (map pretty $ Vector.toList vars) <> ".",
-        pretty lhs <+> "~" <+> pretty rhs
-      ]
+    align $
+      sep
+        [ "∀" <> hsep (map pretty $ Vector.toList vars) <> ".",
+          pretty lhs <+> "~" <+> pretty rhs
+        ]
 
 data DataCtorType = DataCtorType
   { universalVars :: Vector TypeVar,
@@ -127,13 +144,14 @@ data DataCtorType = DataCtorType
 
 instance Pretty DataCtorType where
   pretty DataCtorType {universalVars, existentialVars, coercionVars, fields, ctor, ctorArgs} =
-    hsep
-      [ "∀" <> hsep (map pretty $ Vector.toList universalVars) <> ".",
-        "∃" <> hsep (map pretty $ Vector.toList existentialVars) <> ".",
-        "∃" <> hsep (map (parens . pretty) $ Vector.toList coercionVars) <> ".",
-        hsep (map ((<> "→") . pretty) $ Vector.toList fields),
-        pretty ctor <+> hsep (map pretty $ Vector.toList ctorArgs)
-      ]
+    align (sep [forall_, exists, coerExists, ty])
+    where
+      forall_ = "∀" <> hsep (map pretty $ Vector.toList universalVars) <> "."
+      exists = "∃" <> hsep (map pretty $ Vector.toList existentialVars) <> "."
+      coerExists = "∃" <> hsep (map (parens . pretty) $ Vector.toList coercionVars) <> "."
+      fs = map pretty (Vector.toList fields)
+      ret = pretty (ApplyType ctor (fmap VarType ctorArgs) :: CompleteType)
+      ty = align (sep (punctuate " →" (fs <> [ret])))
 
 simpleDataCtorType :: Text -> DataCtorType
 simpleDataCtorType x = DataCtorType Vector.empty Vector.empty Vector.empty Vector.empty (NamedTypeCtor x) Vector.empty
@@ -159,9 +177,9 @@ instance (Pretty a, Pretty c, Pretty d) => Pretty (Expr a c d) where
   pretty (UnsolvedClassDictionaryExpr d) = pretty d
   pretty (CtorExpr k) = pretty k
   pretty (VarExpr x) = pretty x
-  pretty (LambdaExpr b e) = "λ" <> parens (pretty b) <> "." <+> pretty e
-  pretty (TypeLambdaExpr v e) = "Λ" <> pretty v <> "." <+> pretty e
-  pretty (CoercionLambdaExpr b e) = "Λ" <> parens (pretty b) <> "." <+> pretty e
+  pretty (LambdaExpr b e) = "λ" <> parens (pretty b) <> "." <> lambdaBody e
+  pretty (TypeLambdaExpr v e) = "Λ" <> pretty v <> "." <> lambdaBody e
+  pretty (CoercionLambdaExpr b e) = "Λ" <> parens (pretty b) <> "." <> lambdaBody e
   pretty (ApplyExpr e1 e2) = nested e1 <+> prettyAtomExpr e2
     where
       nested e@ApplyExpr {} = pretty e
@@ -176,10 +194,20 @@ instance (Pretty a, Pretty c, Pretty d) => Pretty (Expr a c d) where
   pretty (CaseExpr e t arms) =
     "case" <+> pretty e <+> "→"
       <+> pretty t
-      <+> encloseSep "{" "}" ", " (map pretty $ Vector.toList arms)
+      <+> "{" <> nest 2 (line <> vsep (punctuate ", " (map pretty $ Vector.toList arms))) <> line <> "}"
   pretty (LetExpr Nothing b e1 e2) = "let" <+> pretty b <+> "=" <+> pretty e1 <+> "in" <+> pretty e2
   pretty (LetExpr (Just id) b e1 e2) = "let" <+> parens (pretty id) <+> pretty b <+> "=" <+> pretty e1 <+> "in" <+> pretty e2
   pretty (CastExpr e c) = pretty e <+> "▹" <+> pretty c
+
+lambdaBody :: (Pretty a, Pretty c, Pretty d) => Expr a c d -> Doc ann
+lambdaBody e
+  | isLambdaExpr e = space <> pretty e
+  | otherwise = nest 2 (line <> pretty e)
+  where
+    isLambdaExpr LambdaExpr {} = True
+    isLambdaExpr TypeLambdaExpr {} = True
+    isLambdaExpr CoercionLambdaExpr {} = True
+    isLambdaExpr _ = False
 
 prettyAtomExpr :: (Pretty a, Pretty c, Pretty d) => Expr a c d -> Doc ann
 prettyAtomExpr e@ApplyExpr {} = parens (pretty e)
@@ -214,17 +242,17 @@ type CompleteCaseArm = CaseArm Void Void Void
 
 instance (Pretty a, Pretty c, Pretty d) => Pretty (CaseArm a c d) where
   pretty CaseArm {implicationId, ctor, typeArgs, existentialVars, coercionVars, termVars, body} =
-    hsep
-      [ implicId,
-        pretty ctor,
-        hsep (map (("@" <>) . prettyAtomType) $ Vector.toList typeArgs),
-        hsep (map ((">" <>) . pretty) $ Vector.toList existentialVars),
-        hsep (map ((">" <>) . parens . pretty) $ Vector.toList coercionVars),
-        hsep (map (parens . pretty) $ Vector.toList termVars),
-        "=>",
-        pretty body
-      ]
+    lhs <+> "=>" <> nest 2 (line <> pretty body)
     where
+      lhs =
+        hsep
+          ( implicId :
+            pretty ctor :
+            map (("@" <>) . prettyAtomType) (Vector.toList typeArgs)
+              <> map ((">" <>) . pretty) (Vector.toList existentialVars)
+              <> map ((">" <>) . parens . pretty) (Vector.toList coercionVars)
+              <> map (parens . pretty) (Vector.toList termVars)
+          )
       implicId =
         case implicationId of
           Just id -> parens (pretty id)
@@ -256,7 +284,7 @@ data TypeCtor
 instance Pretty TypeCtor where
   pretty (NamedTypeCtor k) = unsafeTextWithoutNewlines k
   pretty (ClassDictionaryTypeCtor k) = "{" <> pretty k <> "}"
-  pretty FunctionTypeCtor = "(->)"
+  pretty FunctionTypeCtor = "(→)"
 
 data Type a
   = UniType a
@@ -279,8 +307,8 @@ instance Pretty a => Pretty (Type a) where
   pretty (UniType a) = pretty a
   pretty (VarType v) = pretty v
   pretty (FunctionType t1 t2)
-    | isNested t1 = parens (pretty t1) <+> "->" <+> pretty t2
-    | otherwise = pretty t1 <+> "->" <+> pretty t2
+    | isNested t1 = parens (pretty t1) <+> "→" <+> pretty t2
+    | otherwise = pretty t1 <+> "→" <+> pretty t2
     where
       isNested (FunctionType _ _) = True
       isNested _ = False
@@ -350,7 +378,10 @@ instance (Pretty a, Pretty c) => Pretty (Coercion a c) where
   pretty (FamilyCoercion k cs) = "<" <> hsep (pretty k : map prettyAtomCoercion (Vector.toList cs)) <> ">"
   pretty (RightCoercion n c) = prettyAtomCoercion c <> "[" <> pretty n <> "]"
   pretty (ReflCoercion t) = "<" <> pretty t <> ">"
-  pretty (TransCoercion c1 c2) = prettyAtomCoercion c1 <+> "∘" <+> prettyAtomCoercion c2
+  pretty (TransCoercion c1 c2) = pretty c1 <+> "∘" <+> nested c2
+    where
+      nested c@TransCoercion {} = parens (pretty c)
+      nested c = pretty c
   pretty (SymmCoercion c) = "sym" <+> prettyAtomCoercion c
   pretty (EquivalentCoercion c1 c2) = prettyAtomCoercion c1 <> "," <+> prettyAtomCoercion c2
 
@@ -359,4 +390,5 @@ prettyAtomCoercion c@UnsolvedCoercion {} = pretty c
 prettyAtomCoercion c@VarCoercion {} = pretty c
 prettyAtomCoercion c@FamilyCoercion {} = pretty c
 prettyAtomCoercion c@ReflCoercion {} = pretty c
+prettyAtomCoercion c@RightCoercion {} = pretty c
 prettyAtomCoercion c = parens (pretty c)
