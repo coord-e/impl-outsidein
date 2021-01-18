@@ -2,11 +2,8 @@
 
 [![Actions Status](https://github.com/coord-e/impl-outsidein/workflows/CI/badge.svg)](https://github.com/coord-e/impl-outsidein/actions?workflow=CI)
 
-This repository contains the toy implementation of OutsideIn(X) type inference algorithm[[1]](#1), along with the following instantiation of constraint domain X:
-
-- [`SimpleUnification`](src/Language/Simple/ConstraintDomain/SimpleUnification.hs): Solve equality constraints by unification.
-- [`TypeClass`](src/Language/Simple/ConstraintDomain/TypeClass.hs): Solve equality and type class constraints.
-- [`TypeClassTypeFamily`](src/Language/Simple/ConstraintDomain/TypeClassTypeFamily): Solve equality and type class constraints involving type families with the algorithm described in §7 of [[1]](#1).
+This repository contains the toy implementation of OutsideIn(X) type inference algorithm[[1]](#1).
+The `evidence` branch implements evidence generation on top of the type class and type family solver presented in [[1]](#1).
 
 ## Bibliography
 
