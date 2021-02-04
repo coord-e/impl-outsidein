@@ -59,7 +59,6 @@ import Language.Core.Type.Env
 import Language.Core.Type.Error (TypeError (..))
 import Language.Core.Type.Substitution (substProposition, substType)
 import qualified Language.Core.Type.Substitution as Subst (fromVars, singleton)
-import Language.Simple.Fresh (Fresh (..))
 import Prettyprinter (pretty, (<+>))
 import Util (findDuplicate, logDocInfo, orThrowM)
 
@@ -111,12 +110,11 @@ typeExpr e@(CtorExpr k) = do
     } <-
     findDataCtor k
   let funTy = foldr FunctionType (ApplyType ctor $ fmap VarType ctorArgs) fields
-  t <- refreshType $ foldr ForallType (foldr ForallType (foldr CoercionForallType funTy coercionVars) existentialVars) universalVars
+  let t = foldr ForallType (foldr ForallType (foldr CoercionForallType funTy coercionVars) existentialVars) universalVars
   pure (e, t)
 typeExpr e@(VarExpr x) = do
   t <- findTermVar x
-  t' <- refreshType t
-  pure (e, t')
+  pure (e, t)
 typeExpr (LambdaExpr b@(TermVarBinder _ paramTy) e) = do
   checkType paramTy
   (e', bodyTy) <- withTermVar b $ typeExpr e
@@ -137,7 +135,8 @@ typeExpr (TypeApplyExpr e t) = do
   checkType t
   (e', lhs) <- typeExpr e
   (v, bodyTy) <- assertForallType lhs
-  pure (TypeApplyExpr e' t, substType (Subst.singleton v t) bodyTy)
+  bodyTy' <- substType (Subst.singleton v t) bodyTy
+  pure (TypeApplyExpr e' t, bodyTy')
 typeExpr (CoercionApplyExpr e c) = do
   (e', t) <- typeExpr e
   (c', p) <- coercionProposition c
@@ -169,18 +168,20 @@ typeExpr (CaseExpr e armTy arms) = do
       let subst = Subst.fromVars (universalVars <> existentialVars') (typeArgs <> fmap VarType existentialVars)
       assertLengthMatch coercionVars coercionVars'
       forM_ (Vector.zip coercionVars coercionVars') $
-        \(CoercionVarBinder _ p, p') -> assertPropositionMatch p (substProposition subst p')
+        \(CoercionVarBinder _ p, p') -> assertPropositionMatch p =<< substProposition subst p'
       withTypeVars existentialVars $
         withCoercionVars coercionVars $ do
           assertLengthMatch termVars fields
           forM_ (Vector.zip termVars fields) $
             \(TermVarBinder _ t, t') -> do
               checkType t
-              assertTypeMatch t (substType subst t')
+              assertTypeMatch t =<< substType subst t'
           assertTypeCtorMatch k k'
           assertLengthMatch params ctorArgs
           forM_ (Vector.zip params ctorArgs) $
-            \(t, t') -> assertTypeMatch t (substType subst (VarType t'))
+            \(t, v) -> do
+              t' <- substType subst (VarType v)
+              assertTypeMatch t t'
           (body', bodyTy) <- withTermVars termVars $ typeExpr body
           pure (arm {body = body'}, bodyTy)
 typeExpr (LetExpr mid b@(TermVarBinder _ t) e1 e2) = do
@@ -197,19 +198,14 @@ typeExpr (CastExpr e c) = do
     ReflCoercion _ -> pure (e', t2)
     _ -> pure (CastExpr e' c', t2)
 
-refreshType :: Fresh m => CompleteType -> m CompleteType
-refreshType (ForallType v t) = do
-  v' <- fresh
-  t' <- refreshType (substType (Subst.singleton v (VarType v')) t)
-  pure (ForallType v' t')
-refreshType t = pure t
-
 coercionProposition :: MonadError TypeError m => CompleteCoercion -> EnvT m (CompleteCoercion, CompleteProposition)
 coercionProposition c@(AxiomCoercion n tys) = do
   ForallAxiomScheme {vars, lhs, rhs} <- findAxiomScheme n
   assertLengthMatch vars tys
   let subst = Subst.fromVars vars tys
-  pure (c, Proposition (substType subst lhs) (substType subst rhs))
+  lhs' <- substType subst lhs
+  rhs' <- substType subst rhs
+  pure (c, Proposition lhs' rhs')
 coercionProposition c@(VarCoercion v) = do
   p <- findCoercionVar v
   pure (c, p)
